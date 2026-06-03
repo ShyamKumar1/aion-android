@@ -29,9 +29,19 @@ class ConversationRepository @Inject constructor(
         messageDao.forConversation(conversationId)
 
     suspend fun getOrCreateConversation(): ConversationEntity {
-        // For Phase 1 we always create a new conversation per session to keep
-        // things simple. A "resume last conversation" feature lands in Phase 2.
+        // Creates a new conversation per session. "Resume last conversation"
+        // lands in Phase 2 with conversation history management.
         return createConversation()
+    }
+
+    /** Get all conversations, newest first. */
+    suspend fun getConversationList(): List<ConversationEntity> =
+        conversationDao.getAllSync()
+
+    /** Permanently delete a conversation and all its messages. */
+    suspend fun deleteConversation(id: String) {
+        conversationDao.delete(id)
+        // Messages are cascade-deleted by Room's foreign key constraint.
     }
 
     suspend fun createConversation(title: String = "New chat"): ConversationEntity {

@@ -7,6 +7,7 @@ import com.aion.agent.core.AgentEvent
 import com.aion.agent.core.AgentLoop
 import com.aion.agent.data.ConversationRepository
 import com.aion.agent.data.ProviderRepository
+import com.aion.agent.memory.db.ConversationEntity
 import com.aion.agent.skills.SkillResult
 import com.aion.agent.skills.builtin.SmsSkill
 import com.aion.agent.system.AgentForegroundService
@@ -23,14 +24,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Drives [ChatScreen]. Translates user input into [AgentLoop] calls and
- * surfaces streamed events as UI state.
- *
- * Per AION_GUIDELINES §4:
- *  - Does not import anything from androidx.compose
- *  - Holds a single [StateFlow] for UI
- *  - Calls [AgentLoop] for the heavy lifting
- *  - Handles SMS confirmations by invoking [SmsSkill.sendNow]
+ * Drives [ChatScreen]. Manages conversations, message streaming, and
+ * session lifecycle.
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -48,12 +43,94 @@ class ChatViewModel @Inject constructor(
     private var streamingJob: Job? = null
 
     init {
-        // Start the foreground service so the chat is hosted by an
-        // ongoing process the OS won't aggressively kill.
         AgentForegroundService.start(appContext)
         viewModelScope.launch {
             val ready = providerRepository.hasActiveProvider()
             _uiState.update { it.copy(isReady = ready) }
+            loadConversations()
+        }
+    }
+
+    /** Load the conversation list. First one becomes the active session. */
+    private suspend fun loadConversations() {
+        val conversations = conversationRepository.getConversationList()
+        _uiState.update { it.copy(conversations = conversations) }
+        if (conversations.isNotEmpty()) {
+            val first = conversations.first()
+            _uiState.update {
+                it.copy(
+                    currentConversationId = first.id,
+                    messages = listOf(),
+                )
+            }
+        }
+    }
+
+    /** Start a new, empty conversation. */
+    fun onNewChat() {
+        if (_uiState.value.isResponding) return
+        streamingJob?.cancel()
+        viewModelScope.launch {
+            val convo = conversationRepository.createConversation()
+            _uiState.update {
+                it.copy(
+                    currentConversationId = convo.id,
+                    messages = emptyList(),
+                    inputText = "",
+                    errorMessage = null,
+                    conversations = listOf(convo) + it.conversations,
+                )
+            }
+        }
+    }
+
+    /** Switch to an existing conversation. */
+    fun onConversationSelected(conversationId: String) {
+        if (_uiState.value.isResponding) return
+        if (_uiState.value.currentConversationId == conversationId) return
+        streamingJob?.cancel()
+        viewModelScope.launch {
+            val msgs = conversationRepository.getMessages(conversationId)
+            _uiState.update {
+                it.copy(
+                    currentConversationId = conversationId,
+                    messages = msgs.map { m ->
+                        ChatMessage(
+                            id = m.id,
+                            role = when (m.role) {
+                                "user" -> ChatMessage.Role.USER
+                                "assistant" -> ChatMessage.Role.ASSISTANT
+                                "system" -> ChatMessage.Role.SYSTEM
+                                "tool" -> ChatMessage.Role.TOOL
+                                else -> ChatMessage.Role.USER
+                            },
+                            content = m.content,
+                        )
+                    },
+                    inputText = "",
+                    errorMessage = null,
+                )
+            }
+        }
+    }
+
+    /** Delete a conversation entirely. */
+    fun onDeleteConversation(conversationId: String) {
+        viewModelScope.launch {
+            conversationRepository.deleteConversation(conversationId)
+            _uiState.update { state ->
+                val updated = state.conversations.filter { it.id != conversationId }
+                val newId = if (state.currentConversationId == conversationId) {
+                    updated.firstOrNull()?.id
+                } else {
+                    state.currentConversationId
+                }
+                state.copy(
+                    conversations = updated,
+                    currentConversationId = newId,
+                    messages = if (newId == null) emptyList() else state.messages,
+                )
+            }
         }
     }
 
@@ -74,11 +151,7 @@ class ChatViewModel @Inject constructor(
 
     private fun send(text: String) {
         _uiState.update {
-            it.copy(
-                inputText = "",
-                isResponding = true,
-                errorMessage = null,
-            )
+            it.copy(inputText = "", isResponding = true, errorMessage = null)
         }
         viewModelScope.launch(Dispatchers.IO) {
             val conversationId = currentOrCreateConversation()
@@ -143,16 +216,12 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { state ->
                     state.copy(
                         messages = state.messages.map { m ->
-                            if (m.id == assistantId) {
-                                m.copy(content = m.content + event.text)
-                            } else m
+                            if (m.id == assistantId) m.copy(content = m.content + event.text) else m
                         },
                     )
                 }
             }
-            is AgentEvent.ToolCall -> {
-                logger.d("ChatVM") { "Tool call: ${event.toolName}" }
-            }
+            is AgentEvent.ToolCall -> logger.d("ChatVM") { "Tool call: ${event.toolName}" }
             is AgentEvent.SkillInvoked -> {
                 _uiState.update { state ->
                     state.copy(
@@ -190,36 +259,23 @@ class ChatViewModel @Inject constructor(
                     )
                 }
             }
-            is AgentEvent.Error -> {
-                _uiState.update { it.copy(errorMessage = event.message) }
-            }
-            is AgentEvent.AssistantStarted,
-            is AgentEvent.Finished,
-            is AgentEvent.Done -> {
-                // No-op in UI
-            }
+            is AgentEvent.Error -> _uiState.update { it.copy(errorMessage = event.message) }
+            is AgentEvent.AssistantStarted, is AgentEvent.Finished, is AgentEvent.Done -> {}
         }
     }
 
-    /**
-     * Called by the UI when the user taps "Confirm" on a pending
-     * confirmation. For Phase 1 the only confirmable skill is SMS.
-     */
     fun onConfirm(confirm: ConfirmationRequest) {
         val conversationId = _uiState.value.currentConversationId ?: return
         if (confirm.skillId != "sms.send") {
             _uiState.update { it.copy(errorMessage = "This action cannot be confirmed yet.") }
             return
         }
-        // Parse phone + body out of the confirmation prompt. The SmsSkill
-        // emits the prompt as: Send SMS to <num>: "<body>"?
         val phoneMatch = Regex("""Send SMS to (\+?\d[\d\s-]+):""").find(confirm.prompt)
         val to = phoneMatch?.groupValues?.getOrNull(1)?.replace(Regex("""[\s-]"""), "") ?: run {
             _uiState.update { it.copy(errorMessage = "Could not parse phone number.") }
             return
         }
         val body = confirm.prompt.substringAfter("\"", "").substringBefore("\"", "")
-
         viewModelScope.launch(Dispatchers.IO) {
             val result = smsSkill.sendNow(to, body)
             val summary = when (result) {
@@ -237,30 +293,24 @@ class ChatViewModel @Inject constructor(
                     ),
                 )
             }
-            conversationRepository.appendMessage(
-                conversationId = conversationId,
-                role = "system",
-                content = summary,
-            )
+            conversationRepository.appendMessage(conversationId = conversationId, role = "system", content = summary)
         }
     }
 
     fun onCancel(@Suppress("UNUSED_PARAMETER") confirm: ConfirmationRequest) {
-        // Phase 1: the confirmation card is dismissed by Compose local state.
-        // A persistent "denied" trail is recorded by appending a system message
-        // to the conversation history.
         val conversationId = _uiState.value.currentConversationId ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            conversationRepository.appendMessage(
-                conversationId = conversationId,
-                role = "system",
-                content = "User cancelled the action.",
-            )
+            conversationRepository.appendMessage(conversationId = conversationId, role = "system", content = "User cancelled the action.")
         }
     }
 
     fun onErrorDismissed() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    /** Toggle the conversation list panel. */
+    fun onToggleConversationList() {
+        _uiState.update { it.copy(showConversationList = !it.showConversationList) }
     }
 
     override fun onCleared() {

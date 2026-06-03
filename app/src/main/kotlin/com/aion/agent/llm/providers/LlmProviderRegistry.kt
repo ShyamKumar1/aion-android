@@ -21,7 +21,9 @@ data class ProviderConfig(
     val defaultHeaders: Map<String, String> = emptyMap(),
     val availableModels: List<ProviderModel>,
     val supportsToolCalling: Boolean = true,
+    val supportsModelList: Boolean = true,
     val notes: String = "",
+    val modelListPath: String = "/v1/models",
 )
 
 data class ProviderModel(
@@ -56,17 +58,6 @@ object LlmProviderRegistry {
         notes = "Single API key for every model. Recommended default.",
     )
 
-    val OpencodeGo = ProviderConfig(
-        id = "opencode-go",
-        displayName = "Opencode Go",
-        baseUrl = "https://api.opencode.ai/v1/",
-        availableModels = listOf(
-            ProviderModel("minimax-m3", "MiniMax M3", 32_000, notes = "Default Opencode model"),
-            ProviderModel("deepseek-v4-flash", "DeepSeek V4 Flash", 32_000, notes = "Fast DeepSeek variant"),
-        ),
-        notes = "Used by Opencode CLI. Free tier available — confirm at opencode.ai.",
-    )
-
     val NvidiaNim = ProviderConfig(
         id = "nvidia-nim",
         displayName = "NVIDIA NIM",
@@ -85,7 +76,20 @@ object LlmProviderRegistry {
         notes = "Hosted NIM at build.nvidia.com — OpenAI-compatible.",
     )
 
-    val All: List<ProviderConfig> = listOf(OpenRouter, NvidiaNim)
+    val OpencodeGo = ProviderConfig(
+        id = "opencode-go",
+        displayName = "Opencode Go",
+        baseUrl = "https://api.opencode.ai/v1/",
+        supportsModelList = false,
+        modelListPath = "",
+        availableModels = listOf(
+            ProviderModel("minimax-m3", "MiniMax M3", 32_000, notes = "Default Opencode model"),
+            ProviderModel("deepseek-v4-flash", "DeepSeek V4 Flash", 32_000, notes = "Fast DeepSeek variant"),
+        ),
+        notes = "Free models included or use your own key.",
+    )
+
+    val All: List<ProviderConfig> = listOf(OpenRouter, OpencodeGo, NvidiaNim)
 
     fun byId(id: String): ProviderConfig? = All.firstOrNull { it.id == id }
 }

@@ -1,8 +1,9 @@
 package com.aion.agent.ui.chat
 
+import com.aion.agent.memory.db.ConversationEntity
+
 /**
- * One chat message as seen by the UI. Distinct from [com.aion.agent.memory.db.MessageEntity]
- * so the UI doesn't depend on Room types.
+ * One chat message as seen by the UI.
  */
 data class ChatMessage(
     val id: String,
@@ -26,9 +27,11 @@ data class ConfirmationRequest(
  */
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
+    val conversations: List<ConversationEntity> = emptyList(),
     val isResponding: Boolean = false,
     val isReady: Boolean = false,
     val errorMessage: String? = null,
     val inputText: String = "",
     val currentConversationId: String? = null,
+    val showConversationList: Boolean = false,
 )
