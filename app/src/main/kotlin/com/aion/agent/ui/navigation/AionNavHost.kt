@@ -1,6 +1,7 @@
 package com.aion.agent.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
@@ -18,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.aion.agent.ui.chat.ChatScreen
+import com.aion.agent.ui.settings.BatteryDashboardScreen
 import com.aion.agent.ui.settings.SettingsScreen
 
 /**
@@ -38,7 +40,10 @@ fun AionNavHost(
                 ChatScreen(paddingValues = padding)
             }
             composable(Route.Settings.path) {
-                SettingsScreen()
+                SettingsScreen(onNavigateToBattery = { navController.navigate(Route.Battery.path) })
+            }
+            composable(Route.Battery.path) {
+                BatteryDashboardScreen()
             }
         }
     }
@@ -76,6 +81,7 @@ sealed class Route(
 ) {
     data object Chat : Route("chat", "Chat", Icons.Filled.SmartToy)
     data object Settings : Route("settings", "Settings", Icons.Filled.Settings)
+    data object Battery : Route("settings/battery", "Battery", Icons.Filled.BatteryFull)
 
     companion object {
         val All = listOf(Chat, Settings)
