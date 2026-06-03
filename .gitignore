@@ -1,0 +1,38 @@
+# Built application files
+*.apk
+*.aab
+*.ap_
+*.aar
+*.dex
+
+# Java/Kotlin compiled output
+*.class
+
+# Gradle
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# NDK
+.cxx/
+obj/
+
+# Keystores
+*.jks
+*.keystore
+release.keystore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local config with secrets
+secrets.properties

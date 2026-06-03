@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AION</string>
+    <string name="accessibility_service_label">AION Screen Awareness</string>
+    <string name="notification_listener_label">AION Notification Access</string>
+
+    <!-- Chat -->
+    <string name="chat_send">Send</string>
+    <string name="chat_input_hint">Ask AION anything…</string>
+    <string name="chat_empty_state">Try asking me to send a text, or just chat.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">AION — Your private AI phone agent</string>
+    <string name="onboarding_welcome_cta">Get Started</string>
+    <string name="onboarding_privacy_title">Everything stays on your phone.</string>
+    <string name="onboarding_privacy_point_1">Your data never leaves this device unless you choose.</string>
+    <string name="onboarding_privacy_point_2">Open source — anyone can verify the code.</string>
+    <string name="onboarding_privacy_point_3">You control which permissions to grant.</string>
+    <string name="onboarding_privacy_point_4">No accounts. No tracking.</string>
+    <string name="onboarding_privacy_cta">I understand</string>
+    <string name="onboarding_capability_title">Choose your level of access</string>
+    <string name="onboarding_capability_full">Full Access</string>
+    <string name="onboarding_capability_full_desc">AI sees screen, reads notifications, executes actions across apps.</string>
+    <string name="onboarding_capability_partial">Notification Access</string>
+    <string name="onboarding_capability_partial_desc">AI reads notifications, sends SMS, places calls. Cannot see screen.</string>
+    <string name="onboarding_capability_minimal">Chat Only</string>
+    <string name="onboarding_capability_minimal_desc">AI answers questions via chat. No system access.</string>
+    <string name="onboarding_capability_cta">Continue</string>
+    <string name="onboarding_model_title">How should AION work?</string>
+    <string name="onboarding_model_cloud">Cloud-first (Recommended)</string>
+    <string name="onboarding_model_cloud_desc">Works immediately. Add a local model later.</string>
+    <string name="onboarding_model_try">Try it now (no setup)</string>
+    <string name="onboarding_model_try_desc">Limited demo. Set a real key later.</string>
+    <string name="onboarding_model_local">Local model (private)</string>
+    <string name="onboarding_model_local_desc">Download ~1.8GB. Works offline. (Phase 2)</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_provider">Cloud Provider</string>
+    <string name="settings_api_key">API Key</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_capability">Capability Level</string>
+    <string name="settings_battery">Battery Optimization</string>
+    <string name="settings_about">About</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_agent">AION Agent</string>
+    <string name="notification_channel_agent_desc">Persistent notification for the background agent service</string>
+    <string name="notification_agent_title">AION is running</string>
+    <string name="notification_agent_text">Tap to open AION</string>
+
+    <!-- Errors -->
+    <string name="error_network">No network connection.</string>
+    <string name="error_api_key">Invalid or missing API key. Set it in Settings.</string>
+    <string name="error_rate_limited">Provider rate-limited. Try again in a moment.</string>
+    <string name="error_unknown">Something went wrong. Tap to retry.</string>
+    <string name="error_sms_denied">SMS permission denied. Enable in Settings to send texts.</string>
+
+</resources>

@@ -1,0 +1,56 @@
+name: release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  build-release:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.AION_KEYSTORE_BASE64 }}" | base64 -d > /tmp/aion-release.keystore
+        env:
+          AION_KEYSTORE_BASE64: ${{ secrets.AION_KEYSTORE_BASE64 }}
+
+      - name: Decode keystore properties
+        run: |
+          echo "${{ secrets.AION_KEYSTORE_PROPERTIES }}" > /tmp/keystore.properties
+        env:
+          AION_KEYSTORE_PROPERTIES: ${{ secrets.AION_KEYSTORE_PROPERTIES }}
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PATH: /tmp/aion-release.keystore
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload APK to release
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Attach to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true

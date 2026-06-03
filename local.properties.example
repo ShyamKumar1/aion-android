@@ -1,0 +1,4 @@
+# Required for local builds
+# Copy this file to local.properties (which is .gitignored)
+sdk.dir=/Users/leo/Library/Android/sdk
+ndk.dir=/Users/leo/Library/Android/sdk/ndk/27.0.12077973
