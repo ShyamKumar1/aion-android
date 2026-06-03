@@ -2,6 +2,7 @@ package com.aion.agent.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
@@ -19,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.aion.agent.ui.chat.ChatScreen
+import com.aion.agent.ui.notifications.NotificationHistoryScreen
 import com.aion.agent.ui.settings.BatteryDashboardScreen
 import com.aion.agent.ui.settings.SettingsScreen
 
@@ -40,10 +42,16 @@ fun AionNavHost(
                 ChatScreen(paddingValues = padding)
             }
             composable(Route.Settings.path) {
-                SettingsScreen(onNavigateToBattery = { navController.navigate(Route.Battery.path) })
+                SettingsScreen(
+                    onNavigateToBattery = { navController.navigate(Route.Battery.path) },
+                    onNavigateToNotifications = { navController.navigate(Route.Notifications.path) },
+                )
             }
             composable(Route.Battery.path) {
                 BatteryDashboardScreen()
+            }
+            composable(Route.Notifications.path) {
+                NotificationHistoryScreen()
             }
         }
     }
@@ -82,6 +90,7 @@ sealed class Route(
     data object Chat : Route("chat", "Chat", Icons.Filled.SmartToy)
     data object Settings : Route("settings", "Settings", Icons.Filled.Settings)
     data object Battery : Route("settings/battery", "Battery", Icons.Filled.BatteryFull)
+    data object Notifications : Route("settings/notifications", "Notifications", Icons.Filled.Notifications)
 
     companion object {
         val All = listOf(Chat, Settings)
