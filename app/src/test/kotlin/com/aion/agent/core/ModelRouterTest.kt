@@ -19,9 +19,9 @@ class ModelRouterTest {
 
     @Test
     fun `route when local ready returns local`() = runTest {
-        every { localEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns true
         every { localEngine.backendId } returns "local-llama"
-        every { cloudEngine.isReady() } returns false
+        coEvery { cloudEngine.isReady() } returns false
         every { batteryMonitor.isCharging } returns false
         coEvery { batteryMonitor.batteryLevel } returns 80f
 
@@ -32,8 +32,8 @@ class ModelRouterTest {
 
     @Test
     fun `route when local not ready falls to cloud`() = runTest {
-        every { localEngine.isReady() } returns false
-        every { cloudEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns false
+        coEvery { cloudEngine.isReady() } returns true
         every { cloudEngine.backendId } returns "cloud"
 
         val router = ModelRouter(localEngine, cloudEngine, batteryMonitor, logger)
@@ -43,9 +43,9 @@ class ModelRouterTest {
 
     @Test
     fun `route on low battery Auto mode prefers cloud`() = runTest {
-        every { localEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns true
         every { localEngine.backendId } returns "local-llama"
-        every { cloudEngine.isReady() } returns true
+        coEvery { cloudEngine.isReady() } returns true
         every { cloudEngine.backendId } returns "cloud"
         every { batteryMonitor.isCharging } returns false
         coEvery { batteryMonitor.batteryLevel } returns 15f
@@ -57,9 +57,9 @@ class ModelRouterTest {
 
     @Test
     fun `route with preference AlwaysLocal returns local`() = runTest {
-        every { localEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns true
         every { localEngine.backendId } returns "local-llama"
-        every { cloudEngine.isReady() } returns true
+        coEvery { cloudEngine.isReady() } returns true
         every { cloudEngine.backendId } returns "cloud"
 
         val router = ModelRouter(localEngine, cloudEngine, batteryMonitor, logger)
@@ -72,8 +72,8 @@ class ModelRouterTest {
 
     @Test
     fun `route with preference MaximumIntelligence returns cloud`() = runTest {
-        every { localEngine.isReady() } returns true
-        every { cloudEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns true
+        coEvery { cloudEngine.isReady() } returns true
         every { cloudEngine.backendId } returns "cloud"
 
         val router = ModelRouter(localEngine, cloudEngine, batteryMonitor, logger)
@@ -86,8 +86,8 @@ class ModelRouterTest {
 
     @Test(expected = AionException.InvalidConfigurationException::class)
     fun `route when nothing available throws`() = runTest {
-        every { localEngine.isReady() } returns false
-        every { cloudEngine.isReady() } returns false
+        coEvery { localEngine.isReady() } returns false
+        coEvery { cloudEngine.isReady() } returns false
 
         val router = ModelRouter(localEngine, cloudEngine, batteryMonitor, logger)
         router.selectEngine(complexity = 0.3f)
@@ -95,9 +95,9 @@ class ModelRouterTest {
 
     @Test
     fun `route BatterySaver on charger prefers local`() = runTest {
-        every { localEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns true
         every { localEngine.backendId } returns "local-llama"
-        every { cloudEngine.isReady() } returns true
+        coEvery { cloudEngine.isReady() } returns true
         every { cloudEngine.backendId } returns "cloud"
         every { batteryMonitor.isCharging } returns true
         coEvery { batteryMonitor.batteryLevel } returns 60f
@@ -112,9 +112,9 @@ class ModelRouterTest {
 
     @Test
     fun `route BatterySaver on battery prefers cloud`() = runTest {
-        every { localEngine.isReady() } returns true
+        coEvery { localEngine.isReady() } returns true
         every { localEngine.backendId } returns "local-llama"
-        every { cloudEngine.isReady() } returns true
+        coEvery { cloudEngine.isReady() } returns true
         every { cloudEngine.backendId } returns "cloud"
         every { batteryMonitor.isCharging } returns false
         coEvery { batteryMonitor.batteryLevel } returns 60f

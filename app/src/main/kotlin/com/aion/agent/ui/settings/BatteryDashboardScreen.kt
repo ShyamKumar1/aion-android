@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -48,6 +49,7 @@ import kotlin.math.roundToInt
  *  - Sleep mode timeout slider
  *  - Reset stats button
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatteryDashboardScreen(
     viewModel: BatteryDashboardViewModel = hiltViewModel(),

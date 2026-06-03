@@ -1,11 +1,8 @@
 package com.aion.agent.di
 
-import com.aion.agent.core.ModelRouter
 import com.aion.agent.llm.CloudLlmEngine
 import com.aion.agent.llm.LlmEngine
 import com.aion.agent.llm.LocalLlmEngine
-import com.aion.agent.llm.ModelDownloadManager
-import com.aion.agent.llm.ModelManager
 import com.aion.agent.skills.SkillRegistry
 import com.aion.agent.skills.builtin.SmsSkill
 import com.aion.agent.skills.builtin.TimerSkill
@@ -41,18 +38,6 @@ object LlmModule {
     @Provides
     @Singleton
     fun provideDefaultLlmEngine(@CloudLlm impl: LlmEngine): LlmEngine = impl
-
-    @Provides
-    @Singleton
-    fun provideModelManager(impl: ModelManager): ModelManager = impl
-
-    @Provides
-    @Singleton
-    fun provideModelRouter(impl: ModelRouter): ModelRouter = impl
-
-    @Provides
-    @Singleton
-    fun provideModelDownloadManager(impl: ModelDownloadManager): ModelDownloadManager = impl
 
     @Provides
     @Singleton

@@ -22,19 +22,22 @@ class LocalLlmEngineTest {
     @Test
     fun `isReady returns false when bridge not loaded`() = runTest {
         every { bridge.isLoaded } returns false
-        assert(!engine.isReady())
+        val ready = engine.isReady()
+        assert(!ready)
     }
 
     @Test
     fun `isReady returns true when bridge loaded`() = runTest {
         every { bridge.isLoaded } returns true
-        assert(engine.isReady())
+        val ready = engine.isReady()
+        assert(ready)
     }
 
     @Test
     fun `currentModelName returns null when not loaded`() = runTest {
         every { bridge.loadedModelName } returns null
-        assert(engine.currentModelName() == null)
+        val name = engine.currentModelName()
+        assert(name == null)
     }
 
     @Test
@@ -58,13 +61,9 @@ class LocalLlmEngineTest {
     fun `streamReply emits Done when bridge generates`() = runTest {
         every { bridge.isLoaded } returns true
         every { bridge.loadedModelName } returns "qwen.gguf"
-        every { bridge.generate(any(), any(), any()) } returns mockk {
-            every { collect(any()) } answers {
-                val collector = arg<kotlinx.coroutines.flow.FlowCollector<String>>(0)
-                collector.emit("Hello")
-                collector.emit(" world")
-            }
-        }
+        every { bridge.generate(any(), any(), any()) } returns
+            kotlinx.coroutines.flow.flowOf("Hello", " world")
+
         val events = engine.streamReply(
             LlmRequest(systemPrompt = "Be helpful.", messages = emptyList())
         ).toList()
