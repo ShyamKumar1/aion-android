@@ -3,6 +3,9 @@ package com.aion.agent.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
@@ -22,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.aion.agent.ui.chat.ChatScreen
 import com.aion.agent.ui.notifications.NotificationHistoryScreen
 import com.aion.agent.ui.settings.BatteryDashboardScreen
+import com.aion.agent.ui.settings.PrivacyDashboardScreen
 import com.aion.agent.ui.settings.SettingsScreen
 
 /**
@@ -45,6 +49,7 @@ fun AionNavHost(
                 SettingsScreen(
                     onNavigateToBattery = { navController.navigate(Route.Battery.path) },
                     onNavigateToNotifications = { navController.navigate(Route.Notifications.path) },
+                    onNavigateToPrivacy = { navController.navigate(Route.Privacy.path) },
                 )
             }
             composable(Route.Battery.path) {
@@ -52,6 +57,9 @@ fun AionNavHost(
             }
             composable(Route.Notifications.path) {
                 NotificationHistoryScreen()
+            }
+            composable(Route.Privacy.path) {
+                PrivacyDashboardScreen()
             }
         }
     }
@@ -91,6 +99,7 @@ sealed class Route(
     data object Settings : Route("settings", "Settings", Icons.Filled.Settings)
     data object Battery : Route("settings/battery", "Battery", Icons.Filled.BatteryFull)
     data object Notifications : Route("settings/notifications", "Notifications", Icons.Filled.Notifications)
+    data object Privacy : Route("settings/privacy", "Privacy", Icons.Filled.VerifiedUser)
 
     companion object {
         val All = listOf(Chat, Settings)

@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">AION</string>
     <string name="accessibility_service_label">AION Screen Awareness</string>
+    <string name="accessibility_service_description">Allows AION to see your screen, read text, and tap buttons to execute tasks.</string>
     <string name="notification_listener_label">AION Notification Access</string>
 
     <!-- Chat -->

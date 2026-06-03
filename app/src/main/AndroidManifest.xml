@@ -87,7 +87,6 @@
         </service>
 
         <!-- Phase 3: Accessibility Service (user-gated, FULL tier) -->
-        <!--
         <service
             android:name=".system.AgentAccessibilityService"
             android:exported="true"
@@ -100,7 +99,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/aion_accessibility_service_config" />
         </service>
-        -->
 
     </application>
 </manifest>
