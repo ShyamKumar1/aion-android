@@ -2,7 +2,6 @@ package com.aion.agent.llm
 
 import com.aion.agent.core.AionException
 import com.aion.agent.data.ProviderRepository
-import com.aion.agent.llm.providers.LlmProviderRegistry
 import com.aion.agent.llm.providers.OpenAiChatRequest
 import com.aion.agent.llm.providers.OpenAiFunction
 import com.aion.agent.llm.providers.OpenAiMessage
@@ -12,11 +11,11 @@ import com.aion.agent.llm.providers.ProviderConfig
 import com.aion.agent.skills.SkillDefinition
 import com.aion.agent.util.AionLogger
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -25,24 +24,19 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
-import okhttp3.sse.EventSource
-import okhttp3.sse.EventSourceListener
-import okhttp3.sse.EventSources
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * OpenAI-compatible cloud LLM engine. Used by all three Phase-1 providers
- * (OpenRouter, Opencode Go, NVIDIA NIM). They all accept the same wire format
- * and emit Server-Sent Events the same way.
+ * OpenAI-compatible cloud LLM engine. Uses raw HTTP (not OkHttp SSE) for full
+ * control over error handling and response body capture.
  *
- * Streaming: each SSE chunk is parsed as a delta. Token text is emitted as
- * [LlmEvent.Token] events. Final chunk includes a [LlmEvent.Done] with usage.
+ * Sends POST /v1/chat/completions with stream=true, reads the SSE body
+ * line-by-line, and emits tokens as [LlmEvent.Token].
  *
- * This class is the only place that talks to the network for LLM calls.
- * Per AION_GUIDELINES §7, API keys are read from [ProviderRepository] at call
- * time — never passed via constructor, never logged.
+ * On error the full response body is captured and included in the message.
  */
 @Singleton
 class CloudLlmEngine @Inject constructor(
@@ -58,140 +52,113 @@ class CloudLlmEngine @Inject constructor(
 
     override suspend fun currentModelName(): String? = providerRepository.activeModelId()
 
-    override fun streamReply(request: LlmRequest): Flow<LlmEvent> = callbackFlow {
+    override fun streamReply(request: LlmRequest): Flow<LlmEvent> = flow {
         val provider = providerRepository.activeProviderOrThrow()
         val apiKey = providerRepository.activeApiKey()
-            ?: run {
-                trySend(LlmEvent.LlmError(AionException.ProviderAuthException(provider.displayName)))
-                close()
-                return@callbackFlow
-            }
+            ?: throw AionException.ProviderAuthException(provider.displayName)
         val model = providerRepository.activeModelId()
-            ?: run {
-                trySend(LlmEvent.LlmError(AionException.InvalidConfigurationException("No model selected")))
-                close()
-                return@callbackFlow
-            }
+            ?: throw AionException.InvalidConfigurationException("No model selected")
 
-        val body = json.encodeToString(
+        val requestBody = json.encodeToString(
             OpenAiChatRequest.serializer(),
             buildChatRequest(model, request, provider, request.tools),
         )
         val url = provider.baseUrl.trimEnd('/') + "/chat/completions"
-        val reqBuilder = Request.Builder()
+        val httpRequest = Request.Builder()
             .url(url)
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream")
             .header(provider.apiKeyHeader, provider.apiKeyPrefix + apiKey)
-        for ((k, v) in provider.defaultHeaders) {
-            reqBuilder.header(k, v)
-        }
-        val httpRequest = reqBuilder.post(body.toRequestBody(JSON_MEDIA)).build()
+            .apply { for ((k, v) in provider.defaultHeaders) header(k, v) }
+            .post(requestBody.toRequestBody(JSON_MEDIA))
+            .build()
 
-        logger.d(TAG) {
-            "→ ${provider.displayName}/$model (${request.messages.size} msgs, ${request.maxTokens} max)"
+        logger.d(TAG) { "→ ${provider.displayName}/$model (${request.messages.size} msgs)" }
+
+        // Execute the HTTP call (blocking, inside flowOn(IO))
+        val response = httpClient.newCall(httpRequest).execute()
+
+        // Handle error responses with full body capture
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: "(empty)"
+            val detail = try {
+                val errObj = json.decodeFromString<JsonObject>(errorBody)
+                val msg = errObj["error"]
+                when (msg) {
+                    is JsonObject -> msg["message"]?.let { it.toString().trim('"') } ?: msg.toString()
+                    else -> msg?.toString() ?: errorBody.take(200)
+                }
+            } catch (_: Exception) {
+                errorBody.take(200)
+            }
+            throw when (response.code) {
+                401, 403 -> AionException.ProviderAuthException(provider.displayName)
+                429 -> AionException.ProviderRateLimitException(provider.displayName)
+                else -> AionException.ProviderHttpException(provider.displayName, response.code, detail)
+            }
         }
 
-        val factory = EventSources.createFactory(httpClient)
-        // Buffers for tool call deltas, keyed by tool call index.
+        // Parse SSE stream
+        val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
         val toolArgs = mutableMapOf<Int, StringBuilder>()
         val toolNames = mutableMapOf<Int, String>()
         val toolIds = mutableMapOf<Int, String>()
+        var reachedEnd = false
 
-        val listener = object : EventSourceListener() {
+        while (!reachedEnd) {
+            val line = reader.readLine() ?: break
+            if (line.startsWith("data:")) {
+                val data = line.removePrefix("data:").trim()
+                if (data.isEmpty() || data == "[DONE]") continue
 
-            override fun onEvent(
-                eventSource: EventSource,
-                id: String?,
-                type: String?,
-                data: String,
-            ) {
-                if (data.isBlank() || data == "[DONE]") return
-                val chunk: OpenAiStreamChunk = try {
+                val chunk = try {
                     json.decodeFromString(OpenAiStreamChunk.serializer(), data)
                 } catch (t: Throwable) {
-                    logger.w(TAG) { "Skipped malformed SSE chunk: ${data.take(200)}" }
-                    return
+                    logger.w(TAG) { "Bad SSE: ${data.take(100)}" }
+                    continue
                 }
+
                 for (choice in chunk.choices) {
                     val content = choice.delta.content
                     if (!content.isNullOrEmpty()) {
-                        trySend(LlmEvent.Token(content))
+                        emit(LlmEvent.Token(content))
                     }
                     val deltas = choice.delta.toolCalls
                     if (deltas != null) {
                         for (d in deltas) {
                             if (d.function?.name != null) toolNames[d.index] = d.function.name
                             if (d.id != null) toolIds[d.index] = d.id
-                            val args = d.function?.arguments
-                            if (!args.isNullOrEmpty()) {
-                                toolArgs.getOrPut(d.index) { StringBuilder() }.append(args)
+                            if (!d.function?.arguments.isNullOrEmpty()) {
+                                toolArgs.getOrPut(d.index) { StringBuilder() }.append(d.function!!.arguments)
                             }
                         }
                     }
+                    if (choice.finishReason != null && choice.finishReason != "null") {
+                        reachedEnd = true
+                    }
                 }
                 if (chunk.usage != null) {
-                    trySend(
-                        LlmEvent.Done(
-                            LlmUsage(
-                                promptTokens = chunk.usage.promptTokens,
-                                completionTokens = chunk.usage.completionTokens,
-                                totalTokens = chunk.usage.totalTokens,
-                            ),
-                        ),
-                    )
+                    emit(LlmEvent.Done(mapUsage(chunk.usage)))
                 }
-            }
-
-            override fun onFailure(
-                eventSource: EventSource,
-                t: Throwable?,
-                response: Response?,
-            ) {
-                val cause = mapHttpError(provider, response, t)
-                trySend(LlmEvent.LlmError(cause))
-                close(cause)
-            }
-
-            override fun onClosed(eventSource: EventSource) {
-                // Emit any buffered tool calls as a single ToolCall event
-                for ((index, args) in toolArgs) {
-                    val name = toolNames[index] ?: continue
-                    trySend(LlmEvent.ToolCall(toolName = name, argumentsJson = args.toString()))
-                }
-                close()
             }
         }
 
-        val source = factory.newEventSource(httpRequest, listener)
-        awaitClose { source.cancel() }
+        // Emit buffered tool calls
+        for ((index, args) in toolArgs) {
+            val name = toolNames[index] ?: continue
+            emit(LlmEvent.ToolCall(toolName = name, argumentsJson = args.toString()))
+        }
+
+        // Ensure Done is always emitted
+        emit(LlmEvent.Done(null))
     }.flowOn(Dispatchers.IO)
 
-    private fun mapHttpError(
-        provider: ProviderConfig,
-        response: Response?,
-        cause: Throwable?,
-    ): AionException {
-        if (response == null) {
-            return AionException.NetworkUnavailableException().also {
-                cause?.let { c -> it.initCause(c) }
-            }
-        }
-        return when (response.code) {
-            401, 403 -> AionException.ProviderAuthException(provider.displayName)
-            429 -> AionException.ProviderRateLimitException(provider.displayName)
-            in 500..599 -> AionException.ProviderHttpException(
-                provider.displayName,
-                response.code,
-                response.message,
-            )
-            else -> AionException.ProviderHttpException(
-                provider.displayName,
-                response.code,
-                response.message,
-            )
-        }
-    }
+    private fun mapUsage(u: com.aion.agent.llm.providers.OpenAiUsage): LlmUsage =
+        LlmUsage(
+            promptTokens = u.promptTokens,
+            completionTokens = u.completionTokens,
+            totalTokens = u.totalTokens,
+        )
 
     private fun buildChatRequest(
         model: String,
@@ -216,18 +183,15 @@ class CloudLlmEngine @Inject constructor(
                 name = m.toolName,
             )
         }
-        val tools = if (skills.isNotEmpty() && provider.supportsToolCalling) {
-            skills.map { it.toOpenAiTool() }
-        } else {
-            null
-        }
         return OpenAiChatRequest(
             model = model,
             messages = messages,
             temperature = request.temperature,
             max_tokens = request.maxTokens,
             stream = request.stream,
-            tools = tools,
+            tools = if (skills.isNotEmpty() && provider.supportsToolCalling) {
+                skills.map { it.toOpenAiTool() }
+            } else null,
         )
     }
 
@@ -246,9 +210,7 @@ class CloudLlmEngine @Inject constructor(
                     }
                 })
                 put("required", buildJsonArray {
-                    for (p in parameters.filter { it.required }) {
-                        add(p.name)
-                    }
+                    for (p in parameters.filter { it.required }) add(p.name)
                 })
             },
         ),

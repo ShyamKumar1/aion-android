@@ -74,14 +74,18 @@ object LlmProviderRegistry {
         apiKeyHeader = "Authorization",
         apiKeyPrefix = "Bearer ",
         availableModels = listOf(
+            ProviderModel("nvidia/llama-3.1-nemotron-70b-instruct", "Nemotron 70B", 131_072, notes = "Best NVIDIA chat model"),
+            ProviderModel("nvidia/nemotron-4-340b-instruct", "Nemotron 4 340B", 4_096, notes = "NVIDIA's flagship, no tools"),
             ProviderModel("meta/llama-3.1-70b-instruct", "Llama 3.1 70B (NIM)", 131_072),
             ProviderModel("meta/llama-3.1-8b-instruct", "Llama 3.1 8B (NIM)", 131_072, notes = "Smaller, faster"),
-            ProviderModel("nvidia/nemotron-4-340b-instruct", "Nemotron 4 340B", 4_096, notes = "NVIDIA's flagship"),
+            ProviderModel("mistralai/mistral-large", "Mistral Large", 131_072),
+            ProviderModel("google/gemma-3-12b-it", "Gemma 3 12B", 8_192, notes = "Google lightweight"),
         ),
-        notes = "Free tier at build.nvidia.com. Hosted NIM, no infra required.",
+        supportsToolCalling = false,
+        notes = "Hosted NIM at build.nvidia.com — OpenAI-compatible.",
     )
 
-    val All: List<ProviderConfig> = listOf(OpenRouter, OpencodeGo, NvidiaNim)
+    val All: List<ProviderConfig> = listOf(OpenRouter, NvidiaNim)
 
     fun byId(id: String): ProviderConfig? = All.firstOrNull { it.id == id }
 }

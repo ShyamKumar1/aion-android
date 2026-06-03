@@ -151,7 +151,6 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
-    implementation(libs.okhttp.sse)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.serialization)
     implementation(libs.kotlinx.serialization.json)
