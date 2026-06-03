@@ -74,7 +74,9 @@ android {
                 "/META-INF/LICENSE",
                 "/META-INF/LICENSE.txt",
                 "/META-INF/NOTICE",
-                "/META-INF/NOTICE.txt"
+                "/META-INF/NOTICE.txt",
+                "/META-INF/INDEX.LIST",
+                "/META-INF/io.netty.versions.properties",
             )
         }
     }
@@ -160,12 +162,15 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.coil.compose)
 
-    // Ktor (Phase 5 reservation)
+    // Ktor (Phase 5 — MCP server)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.websockets)
+    implementation(libs.ktor.server.netty)
 
     // Unit tests
     testImplementation(libs.junit4)

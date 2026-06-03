@@ -4,8 +4,15 @@ import com.aion.agent.llm.CloudLlmEngine
 import com.aion.agent.llm.LlmEngine
 import com.aion.agent.llm.LocalLlmEngine
 import com.aion.agent.skills.SkillRegistry
+import com.aion.agent.skills.builtin.CalendarSkill
+import com.aion.agent.skills.builtin.CallSkill
+import com.aion.agent.skills.builtin.ClipboardSkill
+import com.aion.agent.skills.builtin.ContactsSkill
+import com.aion.agent.skills.builtin.NotificationSkill
+import com.aion.agent.skills.builtin.ScreenSkill
 import com.aion.agent.skills.builtin.SmsSkill
 import com.aion.agent.skills.builtin.TimerSkill
+import com.aion.agent.skills.builtin.WebSearchSkill
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,10 +51,24 @@ object LlmModule {
     fun providePopulatedSkillRegistry(
         sms: SmsSkill,
         timer: TimerSkill,
+        call: CallSkill,
+        notification: NotificationSkill,
+        screen: ScreenSkill,
+        clipboard: ClipboardSkill,
+        calendar: CalendarSkill,
+        contacts: ContactsSkill,
+        webSearch: WebSearchSkill,
     ): SkillRegistry {
         val registry = SkillRegistry()
         registry.register(sms)
         registry.register(timer)
+        registry.register(call)
+        registry.register(notification)
+        registry.register(screen)
+        registry.register(clipboard)
+        registry.register(calendar)
+        registry.register(contacts)
+        registry.register(webSearch)
         return registry
     }
 }
