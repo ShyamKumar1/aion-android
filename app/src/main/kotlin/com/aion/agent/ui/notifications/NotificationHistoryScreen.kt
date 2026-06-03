@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,11 +47,38 @@ fun NotificationHistoryScreen(
     viewModel: NotificationHistoryViewModel = hiltViewModel(),
 ) {
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Notification History") }) },
     ) { padding ->
-        if (notifications.isEmpty()) {
+        if (error != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    Icons.Filled.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Could not load notifications",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Text(
+                    error!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (notifications.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()

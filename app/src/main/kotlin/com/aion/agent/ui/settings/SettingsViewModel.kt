@@ -44,13 +44,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val active = providerRepository.activeProvider()
             val model = providerRepository.activeModelId()
-            val hasKey = providerRepository.activeApiKey() != null
+            val key = providerRepository.activeApiKey()
+            val hasKey = key != null
             _state.update {
                 it.copy(
                     providers = LlmProviderRegistry.All,
                     activeProviderId = active?.id,
                     activeModelId = model,
                     hasApiKey = hasKey,
+                    savedKey = key ?: "",
                 )
             }
         }
@@ -62,12 +64,14 @@ class SettingsViewModel @Inject constructor(
             ?: ""
         viewModelScope.launch {
             providerRepository.setActiveProvider(providerId, defaultModel)
-            val hasKey = providerRepository.activeApiKey() != null
+            val key = providerRepository.activeApiKey()
+            val hasKey = key != null
             _state.update {
                 it.copy(
                     activeProviderId = providerId,
                     activeModelId = defaultModel,
                     hasApiKey = hasKey,
+                    savedKey = key ?: "",
                     testResult = null,
                     fetchedModels = null,
                 )
@@ -105,6 +109,7 @@ class SettingsViewModel @Inject constructor(
                 it.copy(
                     apiKeyInput = "",
                     hasApiKey = true,
+                    savedKey = key,
                     isSaving = false,
                     saveMessage = "Key saved.",
                 )
@@ -130,6 +135,7 @@ class SettingsViewModel @Inject constructor(
                 it.copy(
                     apiKeyInput = "",
                     hasApiKey = false,
+                    savedKey = "",
                     saveMessage = null,
                     testResult = null,
                     fetchedModels = null,
@@ -153,7 +159,7 @@ class SettingsViewModel @Inject constructor(
             val models = withContext(Dispatchers.IO) {
                 val response = httpClient.newCall(
                     Request.Builder()
-                        .url(provider.baseUrl.trimEnd('/') + provider.modelListPath)
+                        .url(provider.baseUrl.trimEnd('/') + "/" + provider.modelListPath.trimStart('/'))
                         .header("Accept", "application/json")
                         .header(provider.apiKeyHeader, provider.apiKeyPrefix + (providerRepository.activeApiKey() ?: ""))
                         .build()
@@ -187,11 +193,26 @@ class SettingsViewModel @Inject constructor(
             }
         } catch (t: Throwable) {
             logger.e("SettingsVM", t) { "Model fetch failed for ${provider.id}" }
-            _state.update {
-                it.copy(
-                    isTesting = false,
-                    testResult = TestResult.Error("Key saved, but couldn't fetch model list: ${t.message}"),
-                )
+            // Fall back to static model list from provider config
+            val staticModels = provider.availableModels
+            if (staticModels.isNotEmpty()) {
+                val currentModel = _state.value.activeModelId
+                providerRepository.setActiveProvider(provider.id, currentModel ?: staticModels.first().id)
+                _state.update {
+                    it.copy(
+                        fetchedModels = staticModels,
+                        activeModelId = currentModel ?: staticModels.first().id,
+                        isTesting = false,
+                        testResult = TestResult.Success("Using default model list (fetch failed: ${t.message?.take(80)})"),
+                    )
+                }
+            } else {
+                _state.update {
+                    it.copy(
+                        isTesting = false,
+                        testResult = TestResult.Error("Couldn't fetch model list: ${t.message?.take(100)}"),
+                    )
+                }
             }
         }
     }
@@ -203,6 +224,7 @@ data class SettingsUiState(
     val activeModelId: String? = null,
     val apiKeyInput: String = "",
     val hasApiKey: Boolean = false,
+    val savedKey: String = "",
     val isSaving: Boolean = false,
     val isTesting: Boolean = false,
     val saveMessage: String? = null,

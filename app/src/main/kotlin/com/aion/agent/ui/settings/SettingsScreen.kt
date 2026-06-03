@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -62,6 +63,7 @@ fun SettingsScreen(
     onNavigateToBattery: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToPrivacy: () -> Unit = {},
+    onNavigateToLogs: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -163,6 +165,7 @@ fun SettingsScreen(
             ApiKeyField(
                 value = state.apiKeyInput,
                 hasKey = state.hasApiKey,
+                savedKey = state.savedKey,
                 isSaving = state.isSaving,
                 onValueChange = viewModel::onApiKeyChanged,
                 onSave = viewModel::onSaveApiKey,
@@ -327,6 +330,42 @@ fun SettingsScreen(
                 }
             }
 
+            // ---- Event Log link ----
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToLogs() },
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.BugReport,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Event Log",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            "Browse, filter, export all application logs",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = "Open",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             Text(
                 text = "v${BuildConfig.VERSION_NAME} · debug build",
@@ -341,6 +380,7 @@ fun SettingsScreen(
 private fun ApiKeyField(
     value: String,
     hasKey: Boolean,
+    savedKey: String = "",
     isSaving: Boolean,
     onValueChange: (String) -> Unit,
     onSave: () -> Unit,
@@ -349,10 +389,11 @@ private fun ApiKeyField(
     var showMasked by remember { mutableStateOf(true) }
 
     when {
-        // When a key is ALREADY saved, show it masked and read-only with Clear only
+        // When a key is ALREADY saved, show it masked (or unmasked) and read-only with Clear only
         hasKey && value.isEmpty() -> {
+            val displayValue = if (showMasked) "••••••••••••••••" else savedKey
             OutlinedTextField(
-                value = "••••••••••••••••",
+                value = displayValue,
                 onValueChange = {},
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth(),

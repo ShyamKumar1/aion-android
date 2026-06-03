@@ -30,18 +30,11 @@ class AionJsonParser @Inject constructor() {
             val list = json.decodeFromString<OpenAiModelListResponse>(responseBody)
             if (list.data.isNotEmpty()) {
                 return list.data.filter { entry ->
-                    // Filter to instruction-following / text models (skip embeddings, vision-only, etc.)
                     val id = entry.id.lowercase()
-                    !id.contains("embed") &&
-                        !id.contains("instructgp") &&
-                        id.contains("instruct") || id.contains("chat") ||
-                        id.contains("mini") || id.contains("flash") ||
-                        id.contains("sonnet") || id.contains("opus") ||
-                        id.contains("haiku") || id.contains("nemotron") ||
-                        id.contains("llama") || id.contains("mistral") ||
-                        id.contains("gemma") || id.contains("gemini") ||
-                        id.contains("gpt") || id.contains("claude") ||
-                        id.contains("deepseek") || id.contains("qwen")
+                    // Skip embedding and vision-only models
+                    if (id.contains("embed") || id.contains("vision") || id.contains("re Ranking") || id.contains("rerank")) return@filter false
+                    // Include everything else — let the user choose
+                    true
                 }.map { entry ->
                     ProviderModel(
                         id = entry.id,

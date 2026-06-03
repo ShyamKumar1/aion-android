@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -279,78 +281,160 @@ private fun ConversationListPanel(
     onSelect: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.US) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy HH:mm", Locale.US) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp,
     ) {
-        if (conversations.isEmpty()) {
-            Text(
-                text = "No conversations yet",
-                modifier = Modifier.padding(24.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        } else {
-            LazyColumn(modifier = Modifier.height(280.dp)) {
-                items(items = conversations, key = { it.id }) { convo ->
-                    val isActive = convo.id == activeId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(convo.id) }
-                            .background(
-                                if (isActive) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = convo.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Row {
-                                Text(
-                                    text = dateFormat.format(Date(convo.updatedAt)),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                if (convo.messageCount > 0) {
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = "${convo.messageCount} msgs",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            if (convo.preview.isNotBlank()) {
-                                Text(
-                                    text = convo.preview,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        IconButton(onClick = { onDelete(convo.id) }) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = "Delete conversation",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp),
+        Column {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Conversations",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "${conversations.size} total",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HorizontalDivider()
+
+            if (conversations.isEmpty()) {
+                Text(
+                    text = "Start a new conversation",
+                    modifier = Modifier.padding(24.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                LazyColumn(modifier = Modifier.height(300.dp)) {
+                    items(items = conversations, key = { it.id }) { convo ->
+                        val isActive = convo.id == activeId
+                        ConversationListItem(
+                            conversation = convo,
+                            isActive = isActive,
+                            dateFormat = dateFormat,
+                            onSelect = { onSelect(convo.id) },
+                            onDelete = { onDelete(convo.id) },
+                        )
+                        if (convo != conversations.last()) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 16.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ConversationListItem(
+    conversation: ConversationEntity,
+    isActive: Boolean,
+    dateFormat: SimpleDateFormat,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .background(
+                if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                else MaterialTheme.colorScheme.surface,
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Avatar circle with first letter
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isActive) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.primaryContainer
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = conversation.title.firstOrNull()?.uppercase() ?: "?",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isActive) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = conversation.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = dateFormat.format(Date(conversation.updatedAt)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (conversation.messageCount > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "${conversation.messageCount} msgs",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (isActive) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Active",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+            if (conversation.preview.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = conversation.preview,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.size(36.dp),
+        ) {
+            Icon(
+                Icons.Filled.Delete,
+                contentDescription = "Delete",
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
