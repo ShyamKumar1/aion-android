@@ -3,6 +3,8 @@ package com.aion.agent.data
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -85,6 +87,46 @@ class SettingsRepository @Inject constructor(
         if (providerId == null) KEY_API_KEY_PREFIX
         else "$KEY_API_KEY_PREFIX:$providerId"
 
+    // ---- Battery & sleep preferences ----
+
+    suspend fun setModelLoadBatteryLevel(level: Int) {
+        ds.edit { it[KEY_MODEL_LOAD_BATTERY] = level }
+    }
+
+    suspend fun addCpuTime(millis: Long) {
+        ds.edit { prefs ->
+            val current = prefs[KEY_CPU_TIME_MS] ?: 0L
+            prefs[KEY_CPU_TIME_MS] = current + millis
+        }
+    }
+
+    suspend fun getCpuTimeMs(): Long = ds.data.first()[KEY_CPU_TIME_MS] ?: 0L
+
+    suspend fun resetBatteryStats() {
+        ds.edit { it.clear() }
+    }
+
+    suspend fun setSleepTimeoutMinutes(minutes: Int) {
+        ds.edit { it[KEY_SLEEP_TIMEOUT] = minutes }
+    }
+
+    suspend fun getSleepTimeoutMinutes(): Int =
+        ds.data.first()[KEY_SLEEP_TIMEOUT] ?: 5
+
+    suspend fun setLastLoadedModelPath(path: String) {
+        ds.edit { it[KEY_LAST_MODEL_PATH] = path }
+    }
+
+    suspend fun getLastLoadedModelPath(): String? =
+        ds.data.first()[KEY_LAST_MODEL_PATH]
+
+    suspend fun setRoutePreference(preference: String) {
+        ds.edit { it[KEY_ROUTE_PREFERENCE] = preference }
+    }
+
+    suspend fun getRoutePreference(): String? =
+        ds.data.first()[KEY_ROUTE_PREFERENCE]
+
     private companion object {
         const val DATASTORE_NAME = "aion_settings"
         const val SECURE_PREFS_NAME = "aion_secure_prefs"
@@ -94,6 +136,14 @@ class SettingsRepository @Inject constructor(
         val KEY_CAPABILITY: Preferences.Key<String> = stringPreferencesKey("capability")
         val KEY_ONBOARDED: Preferences.Key<String> = stringPreferencesKey("onboarded")
         val KEY_API_KEY_PREFIX = "api_key"
+
+        // Battery & sleep
+        val KEY_MODEL_LOAD_BATTERY = intPreferencesKey("model_load_battery")
+        val KEY_CPU_TIME_MS = longPreferencesKey("cpu_time_ms")
+        val KEY_MODEL_LOADED_TIME_MS = longPreferencesKey("model_loaded_time_ms")
+        val KEY_SLEEP_TIMEOUT = intPreferencesKey("sleep_timeout_minutes")
+        val KEY_LAST_MODEL_PATH = stringPreferencesKey("last_model_path")
+        val KEY_ROUTE_PREFERENCE = stringPreferencesKey("route_preference")
     }
 }
 

@@ -6,4 +6,5 @@ package com.aion.agent.system
  */
 object NotificationChannels {
     const val AGENT = "aion_agent_channel"
+    const val DOWNLOADS = "aion_downloads"
 }

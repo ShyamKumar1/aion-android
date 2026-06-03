@@ -38,6 +38,7 @@ class AionApplication : Application(), Configuration.Provider {
     private fun registerNotificationChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
+        // Agent foreground service channel
         manager.createNotificationChannel(
             NotificationChannel(
                 NotificationChannels.AGENT,
@@ -45,6 +46,18 @@ class AionApplication : Application(), Configuration.Provider {
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = getString(R.string.notification_channel_agent_desc)
+                setShowBadge(false)
+            },
+        )
+
+        // Model download progress channel
+        manager.createNotificationChannel(
+            NotificationChannel(
+                NotificationChannels.DOWNLOADS,
+                "Model Downloads",
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = "GGUF model download progress"
                 setShowBadge(false)
             },
         )
