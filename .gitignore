@@ -36,3 +36,4 @@ Thumbs.db
 
 # Local config with secrets
 secrets.properties
+.aion-env.sh
