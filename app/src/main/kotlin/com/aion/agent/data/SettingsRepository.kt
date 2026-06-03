@@ -71,7 +71,7 @@ class SettingsRepository @Inject constructor(
 
     // ---- Secrets (EncryptedSharedPreferences) ----
 
-    fun activeApiKey(): String? = securePrefs.getString(apiKeyPrefKey(), null)
+    fun activeApiKey(providerId: String): String? = securePrefs.getString(apiKeyPrefKey(providerId), null)
 
     fun setApiKey(providerId: String, apiKey: String) {
         securePrefs.edit().putString(apiKeyPrefKey(providerId), apiKey).apply()

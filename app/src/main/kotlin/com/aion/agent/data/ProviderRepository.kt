@@ -22,7 +22,10 @@ class ProviderRepository @Inject constructor(
     suspend fun activeProviderId(): String? = settings.activeProviderId()
     suspend fun activeProvider(): ProviderConfig? = activeProviderId()?.let(LlmProviderRegistry::byId)
     suspend fun activeModelId(): String? = settings.activeModelId()
-    suspend fun activeApiKey(): String? = settings.activeApiKey()
+    suspend fun activeApiKey(): String? {
+        val providerId = activeProviderId() ?: return null
+        return settings.activeApiKey(providerId)
+    }
     suspend fun hasActiveProvider(): Boolean = activeProviderId() != null && activeApiKey() != null
 
     suspend fun activeProviderOrThrow(): ProviderConfig =
