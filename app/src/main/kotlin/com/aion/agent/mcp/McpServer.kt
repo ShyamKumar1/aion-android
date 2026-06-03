@@ -10,6 +10,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,6 +22,9 @@ import javax.inject.Singleton
  *  - LAN mode: user opt-in to 0.0.0.0
  *  - Token auth via [McpAuthManager]
  *  - Protocol v2025-03-26 via [McpProtocolHandler]
+ *  - Port fallback: 8765 -> 8766 -> 8767 -> 8768
+ *  - Max 3 concurrent clients
+ *  - Audit log of all MCP actions
  */
 @Singleton
 class McpServer @Inject constructor(
@@ -31,6 +35,7 @@ class McpServer @Inject constructor(
     private var server: ApplicationEngine? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val connectedClients = ConcurrentHashMap<String, ConnectedClient>()
+    private val auditLog = ConcurrentLinkedQueue<AuditEntry>()
 
     data class ConnectedClient(
         val id: String,
@@ -38,61 +43,116 @@ class McpServer @Inject constructor(
         val connectedAt: Long,
     )
 
+    data class AuditEntry(
+        val clientId: String,
+        val toolName: String,
+        val params: String,
+        val timestamp: Long,
+        val result: String,
+    )
+
     /**
-     * Start the MCP server on [port] and [bindAddress].
-     * Default is localhost:8765. Pass 0.0.0.0 for LAN mode.
+     * Start the MCP server with port fallback.
+     * Tries [port] first, then 8766, 8767, 8768 if unavailable.
      */
     fun start(port: Int = 8765, bindAddress: String = "127.0.0.1"): Boolean {
         if (server != null) return true
-        return try {
-            server = embeddedServer(Netty, port = port, host = bindAddress) {
-                install(io.ktor.server.websocket.WebSockets)
-                routing {
-                    webSocket("/mcp") {
-                        val ip = call.request.local.remoteHost
-                        val authHeader = call.request.headers["Authorization"] ?: ""
-                        val token = authHeader.removePrefix("Bearer ").trim()
-                            .ifEmpty { call.request.headers["X-Auth-Token"] ?: "" }
-                        if (token.isBlank() || !authManager.validateToken(token, ip)) {
-                            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
-                            return@webSocket
-                        }
-                        val clientId = authManager.generateClientId()
-                        connectedClients[clientId] = ConnectedClient(
-                            clientId, ip, System.currentTimeMillis()
-                        )
-                        logger.i(TAG) { "MCP client connected: $clientId from $ip" }
-                        try {
-                            for (frame in incoming) {
-                                if (frame is Frame.Text) {
-                                    val response = protocolHandler.handle(frame.readText(), clientId)
-                                    send(Frame.Text(response))
+
+        val portsToTry = (listOf(port) + listOf(8765, 8766, 8767, 8768)).distinct()
+
+        for (tryPort in portsToTry) {
+            try {
+                server = embeddedServer(Netty, port = tryPort, host = bindAddress) {
+                    install(io.ktor.server.websocket.WebSockets)
+                    routing {
+                        webSocket("/mcp") {
+                            // --- Max connections check ---
+                            if (connectedClients.size >= MAX_CONNECTIONS) {
+                                close(CloseReason(
+                                    CloseReason.Codes.TRY_AGAIN_LATER,
+                                    "Server busy (max $MAX_CONNECTIONS clients)"
+                                ))
+                                return@webSocket
+                            }
+
+                            // --- Auth ---
+                            val ip = call.request.local.remoteHost
+                            val authHeader = call.request.headers["Authorization"] ?: ""
+                            val token = authHeader.removePrefix("Bearer ").trim()
+                                .ifEmpty { call.request.headers["X-Auth-Token"] ?: "" }
+                            if (token.isBlank() || !authManager.validateToken(token, ip)) {
+                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
+                                return@webSocket
+                            }
+
+                            // --- Register client ---
+                            val clientId = authManager.generateClientId()
+                            connectedClients[clientId] = ConnectedClient(
+                                clientId, ip, System.currentTimeMillis()
+                            )
+                            logger.i(TAG) {
+                                "MCP client connected: $clientId from $ip " +
+                                    "(${connectedClients.size}/$MAX_CONNECTIONS)"
+                            }
+
+                            // --- Message loop ---
+                            try {
+                                for (frame in incoming) {
+                                    if (frame is Frame.Text) {
+                                        val requestText = frame.readText()
+                                        val response = protocolHandler.handle(
+                                            message = requestText,
+                                            clientId = clientId,
+                                            auditCallback = { toolName, params, result ->
+                                                auditLog.add(AuditEntry(
+                                                    clientId = clientId,
+                                                    toolName = toolName,
+                                                    params = params,
+                                                    timestamp = System.currentTimeMillis(),
+                                                    result = result,
+                                                ))
+                                            },
+                                        )
+                                        send(Frame.Text(response))
+                                    }
+                                }
+                            } finally {
+                                connectedClients.remove(clientId)
+                                logger.i(TAG) {
+                                    "MCP client disconnected: $clientId " +
+                                        "(${connectedClients.size}/$MAX_CONNECTIONS)"
                                 }
                             }
-                        } finally {
-                            connectedClients.remove(clientId)
-                            logger.i(TAG) { "MCP client disconnected: $clientId" }
                         }
                     }
+                }.start(wait = false)
+                logger.i(TAG) { "MCP server started on $bindAddress:$tryPort" }
+                return true
+            } catch (e: Exception) {
+                if (tryPort == portsToTry.last()) {
+                    logger.e(TAG, e) { "All MCP ports unavailable (tried $portsToTry)" }
+                    return false
                 }
-            }.start(wait = false)
-            logger.i(TAG) { "MCP server started on $bindAddress:$port" }
-            true
-        } catch (t: Throwable) {
-            logger.e(TAG, t) { "Failed to start MCP server" }
-            false
+                logger.w(TAG) { "Port $tryPort unavailable, trying next port..." }
+            }
         }
+        return false
     }
 
     fun stop() {
         server?.stop(1000, 2000)
         server = null
         connectedClients.clear()
+        auditLog.clear()
     }
 
     fun getConnectedClients(): Map<String, ConnectedClient> = connectedClients.toMap()
 
+    /** Return last 100 audit entries. */
+    fun getAuditLog(): List<AuditEntry> = auditLog.toList().takeLast(100)
+
     companion object {
         private const val TAG = "McpServer"
+        private const val MAX_CONNECTIONS = 3
     }
 }

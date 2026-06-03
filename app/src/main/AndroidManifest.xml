@@ -75,30 +75,5 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- Phase 3: Notification Listener (user-gated, PARTIAL tier) -->
-        <service
-            android:name=".system.AgentNotificationListener"
-            android:exported="true"
-            android:label="@string/notification_listener_label"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
-
-        <!-- Phase 3: Accessibility Service (user-gated, FULL tier) -->
-        <service
-            android:name=".system.AgentAccessibilityService"
-            android:exported="true"
-            android:label="@string/accessibility_service_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/aion_accessibility_service_config" />
-        </service>
-
     </application>
 </manifest>

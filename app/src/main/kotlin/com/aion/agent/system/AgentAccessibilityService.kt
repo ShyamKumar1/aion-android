@@ -2,7 +2,11 @@ package com.aion.agent.system
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.graphics.Path
+import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.aion.agent.util.AionLogger
@@ -51,6 +55,16 @@ class AgentAccessibilityService : AccessibilityService() {
     var isSecureScreen: Boolean = false
         private set
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        // Android 14+ (UPSIDE_DOWN_CAKE) enforces a ~30 min cache timeout.
+        // Enable caching to mitigate re-fetch overhead on timeout expiry.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            setCacheEnabled(true)
+            logger.d(TAG) { "Accessibility cache enabled (API ≥ 34)" }
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
@@ -75,6 +89,36 @@ class AgentAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         logger.w(TAG) { "AccessibilityService interrupted" }
+    }
+
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        logger.w(TAG) { "AccessibilityService unbound — service may have timed out" }
+        createReenableNotification()
+        return super.onUnbind(intent)
+    }
+
+    /** Show a persistent notification guiding the user to re-enable the service. */
+    private fun createReenableNotification() {
+        val channelId = "a11y_reenable"
+        val manager = getSystemService(NotificationManager::class.java)
+        // Create channel for Android 8+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Accessibility Service",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Notifications about accessibility service status"
+            }
+            manager.createNotificationChannel(channel)
+        }
+        val notification = Notification.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle("AION Accessibility Service")
+            .setContentText("The accessibility service was disconnected. Please re-enable it in Settings.")
+            .setAutoCancel(true)
+            .build()
+        manager.notify(1001, notification)
     }
 
     private fun captureScreen() {

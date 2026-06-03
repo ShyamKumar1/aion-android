@@ -45,15 +45,27 @@ class AccessibilityTree @Inject constructor() {
     /**
      * Flatten the tree into indented text lines, deduplicating as we go.
      */
+    private var passwordFieldNoteAdded = false
+
     private fun StringBuilder.flatten(node: UiNode, depth: Int, seen: MutableSet<String>) {
-        val text = node.text?.take(100) ?: return // skip nodes without text
-        val sig = "${node.className}|${text}"
+        val rawText = node.text?.take(100) ?: return // skip nodes without text
+
+        // Skip password field placeholder nodes; add note once
+        if (rawText == "[password field]") {
+            if (!passwordFieldNoteAdded) {
+                passwordFieldNoteAdded = true
+                appendLine("[A password field is present on screen]")
+            }
+            return
+        }
+
+        val sig = "${node.className}|${rawText}"
         if (sig in seen) return
         seen.add(sig)
 
         val indent = "  ".repeat(depth.coerceAtMost(8))
         val clickable = if (node.clickable) " [tapable]" else ""
-        appendLine("$indent$text$clickable")
+        appendLine("$indent$rawText$clickable")
 
         for (child in node.children) {
             flatten(child, depth + 1, seen)
@@ -76,9 +88,12 @@ class AccessibilityTree @Inject constructor() {
                 child.recycle()
             }
         }
+        // Redact password field content per AION_GUIDELINES §10
+        val isPassword = info.isPassword
+        val displayText = if (isPassword) "[password field]" else info.text?.toString()
         return UiNode(
             id = nextId,
-            text = info.text?.toString(),
+            text = displayText,
             className = info.className?.toString(),
             clickable = info.isClickable,
             bounds = if (info.isVisibleToUser) bounds else null,

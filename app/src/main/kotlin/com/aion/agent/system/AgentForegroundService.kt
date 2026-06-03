@@ -1,12 +1,15 @@
 package com.aion.agent.system
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import com.aion.agent.BuildConfig
 import com.aion.agent.MainActivity
 import com.aion.agent.R
 import com.aion.agent.llm.ModelManager
@@ -51,6 +54,8 @@ class AgentForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildNotification())
+        // Cancel any pending restart alarm - we're alive
+        cancelRestart(this)
         logger.d(TAG) { "Service started, command: ${intent?.action}" }
         return START_STICKY
     }
@@ -91,11 +96,17 @@ class AgentForegroundService : Service() {
 
     override fun onDestroy() {
         sleepController.stop()
+        // Schedule a restart alarm in case the service is killed by the system
+        scheduleRestart(this)
         super.onDestroy()
     }
 
     companion object {
         const val NOTIFICATION_ID = 4242
+        const val ACTION_RESTART = "${BuildConfig.APPLICATION_ID}.action.RESTART"
+        private const val REQUEST_CODE_RESTART = 9001
+        private const val WATCHDOG_INTERVAL_MS = 5 * 60 * 1000L
+        private const val RESTART_DELAY_MS = 30_000L
         private const val TAG = "AgentFgs"
 
         fun start(context: Context) {
@@ -109,6 +120,32 @@ class AgentForegroundService : Service() {
 
         fun stop(context: Context) {
             context.stopService(Intent(context, AgentForegroundService::class.java))
+        }
+
+        fun scheduleRestart(context: Context, delayMs: Long = RESTART_DELAY_MS) {
+            val intent = Intent(context, AgentForegroundService::class.java).apply {
+                action = ACTION_RESTART
+            }
+            val pending = PendingIntent.getService(
+                context,
+                REQUEST_CODE_RESTART,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarm.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + delayMs, pending)
+        }
+
+        fun cancelRestart(context: Context) {
+            val intent = Intent(context, AgentForegroundService::class.java).apply {
+                action = ACTION_RESTART
+            }
+            val pending = PendingIntent.getService(
+                context, REQUEST_CODE_RESTART, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_NO_CREATE
+            )
+            pending?.cancel()
         }
     }
 }

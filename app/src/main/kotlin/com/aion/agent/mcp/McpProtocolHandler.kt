@@ -16,6 +16,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * Callback invoked after each MCP action is handled.
+ * @param toolName  the method name (or actual tool name for tools/call)
+ * @param params    the request params as a JSON string
+ * @param result    "OK" or "ERROR"
+ */
+typealias AuditCallback = (toolName: String, params: String, result: String) -> Unit
+
+/**
  * Handles MCP protocol messages per v2025-03-26.
  *
  * Supports: initialize, tools/list, tools/call, resources/list, resources/read, ping
@@ -27,13 +35,22 @@ class McpProtocolHandler @Inject constructor(
     private val logger: AionLogger,
 ) {
 
-    suspend fun handle(message: String, clientId: String): String {
+    suspend fun handle(
+        message: String,
+        clientId: String,
+        auditCallback: AuditCallback? = null,
+    ): String {
         return try {
             val request = json.decodeFromString<JsonRpcMessage>(message)
-            val method = request.method ?: return errorResponse(request.id, -32600, "Method not specified")
+            val method = request.method
+            if (method == null) {
+                val errResp = errorResponse(request.id, -32600, "Method not specified")
+                auditCallback?.invoke("unknown", message.take(200), "ERROR")
+                return errResp
+            }
             val params = request.params?.let { it as? JsonObject } ?: JsonObject(emptyMap())
 
-            when (method) {
+            val response = when (method) {
                 "initialize" -> handleInitialize(request.id)
                 "tools/list" -> handleToolsList(request.id)
                 "tools/call" -> handleToolCall(request.id, params, clientId)
@@ -42,9 +59,22 @@ class McpProtocolHandler @Inject constructor(
                 "notifications/initialized" -> handlePing(request.id)
                 else -> errorResponse(request.id, -32601, "Method not found: $method")
             }
+
+            // Determine audit name: for tools/call, log the actual tool being invoked
+            val auditName = if (method == "tools/call") {
+                params["name"]?.jsonPrimitive?.content ?: method
+            } else {
+                method
+            }
+            val auditResult = if (response.contains("\"error\"")) "ERROR" else "OK"
+            auditCallback?.invoke(auditName, params.toString(), auditResult)
+
+            response
         } catch (t: Throwable) {
             logger.e(TAG, t) { "MCP protocol error" }
-            errorResponse(null, -32603, "Internal error: ${t.message}")
+            val errResp = errorResponse(null, -32603, "Internal error: ${t.message}")
+            auditCallback?.invoke("error", t.message ?: "Unknown", "ERROR")
+            errResp
         }
     }
 

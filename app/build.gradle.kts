@@ -13,6 +13,21 @@ android {
     namespace = "com.aion.agent"
     compileSdk = 34
 
+    // Flavor dimensions for build variants (AION_GUIDELINES §18)
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("full") {
+            dimension = "distribution"
+            applicationIdSuffix = ".full"
+            versionNameSuffix = "-full"
+        }
+        create("lite") {
+            dimension = "distribution"
+            applicationIdSuffix = ".lite"
+            versionNameSuffix = "-lite"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.aion.agent"
         minSdk = 26
@@ -91,6 +106,12 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs("src/main/kotlin")
+        }
+        getByName("full") {
+            java.srcDirs("src/full/kotlin")
+        }
+        getByName("lite") {
+            java.srcDirs("src/lite/kotlin")
         }
         getByName("test") {
             java.srcDirs("src/test/kotlin")
