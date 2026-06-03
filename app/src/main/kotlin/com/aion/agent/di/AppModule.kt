@@ -3,8 +3,11 @@ package com.aion.agent.di
 import android.content.Context
 import androidx.room.Room
 import com.aion.agent.memory.db.AionDatabase
+import com.aion.agent.memory.db.ContextSummaryDao
 import com.aion.agent.memory.db.ConversationDao
+import com.aion.agent.memory.db.MemoryDao
 import com.aion.agent.memory.db.MessageDao
+import com.aion.agent.memory.db.NotificationDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -60,4 +63,13 @@ object AppModule {
 
     @Provides
     fun provideMessageDao(db: AionDatabase): MessageDao = db.messageDao()
+
+    @Provides
+    fun provideNotificationDao(db: AionDatabase): NotificationDao = db.notificationDao()
+
+    @Provides
+    fun provideMemoryDao(db: AionDatabase): MemoryDao = db.memoryDao()
+
+    @Provides
+    fun provideContextSummaryDao(db: AionDatabase): ContextSummaryDao = db.contextSummaryDao()
 }
