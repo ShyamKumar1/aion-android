@@ -2,12 +2,10 @@ package com.aion.agent.core
 
 import android.content.Context
 import com.aion.agent.data.ConversationRepository
-import com.aion.agent.llm.LlmEngine
 import com.aion.agent.llm.LlmEvent
 import com.aion.agent.llm.LlmMessage
 import com.aion.agent.llm.LlmRequest
 import com.aion.agent.llm.LlmRole
-import com.aion.agent.llm.providers.LlmProviderRegistry
 import com.aion.agent.skills.AgentSkill
 import com.aion.agent.skills.SkillRegistry
 import com.aion.agent.skills.SkillResult
@@ -39,7 +37,7 @@ import javax.inject.Singleton
 @Singleton
 class AgentLoop @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val llmEngine: LlmEngine,
+    private val modelRouter: ModelRouter,
     private val conversationRepository: ConversationRepository,
     private val intentClassifier: IntentClassifier,
     private val skillRegistry: SkillRegistry,
@@ -110,6 +108,11 @@ class AgentLoop @Inject constructor(
             newUserText = userText,
         )
 
+        val engine = modelRouter.selectEngine(
+            complexity = 0.5f,
+            preference = ModelRouter.RoutePreference.Auto,
+        )
+
         val request = LlmRequest(
             systemPrompt = SYSTEM_PROMPT,
             messages = messages,
@@ -126,7 +129,7 @@ class AgentLoop @Inject constructor(
         )
 
         val buffer = StringBuilder()
-        llmEngine.streamReply(request)
+        engine.streamReply(request)
             .catch { t -> emit(LlmEvent.LlmError(t)) }
             .collect { event ->
                 when (event) {
