@@ -28,9 +28,12 @@ class ConversationRepository @Inject constructor(
     suspend fun getMessages(conversationId: String): List<MessageEntity> =
         messageDao.forConversation(conversationId)
 
-    suspend fun getOrCreateConversation(): ConversationEntity {
-        // Creates a new conversation per session. "Resume last conversation"
-        // lands in Phase 2 with conversation history management.
+    /**
+     * Creates a new conversation for the current session.
+     * This always creates a fresh conversation — "resume last conversation"
+     * will land in Phase 2 with conversation history management.
+     */
+    suspend fun createNewSessionConversation(): ConversationEntity {
         return createConversation()
     }
 

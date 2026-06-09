@@ -11,7 +11,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
- * A skill defined in YAML format. Validated by [SkillScriptEngine].
+ * A skill defined in JSON format. Validated by [SkillScriptEngine].
  */
 @Serializable
 data class YamlSkillDefinition(
@@ -44,7 +44,7 @@ data class YamlStep(
 )
 
 /**
- * Engine that parses and executes YAML skill definitions.
+ * Engine that parses and executes JSON skill definitions.
  *
  * Per AION_GUIDELINES §13:
  *  - Maximum 20 steps per skill
@@ -65,14 +65,12 @@ class SkillScriptEngine @Inject constructor(
     }
 
     /**
-     * Parse a YAML skill string into a [YamlSkillDefinition].
-     * Validates required fields, keyword count, and step count.
+     * Parse a JSON skill string into a [YamlSkillDefinition].
+     * Accepts JSON input. YAML support will be added in a future phase
+     * when a YAML parsing library is included.
      */
-    fun parse(yamlContent: String): Result<YamlSkillDefinition> = runCatching {
-        // Since we don't have a YAML parser library, we use a minimal approach:
-        // Convert YAML-like format to JSON (Phase 4 proper implementation).
-        // For now, validate the structure exists.
-        val def = json.decodeFromString<YamlSkillDefinition>(yamlContent)
+    fun parse(jsonContent: String): Result<YamlSkillDefinition> = runCatching {
+        val def = json.decodeFromString<YamlSkillDefinition>(jsonContent)
         require(def.id.isNotBlank()) { "Skill id is required" }
         require(def.name.isNotBlank()) { "Skill name is required" }
         require(def.keywords.size in 5..20) { "Keywords must be 5-20" }
@@ -167,7 +165,7 @@ class SkillScriptEngine @Inject constructor(
     }
 
     /**
-     * Convert a YAML skill to an [AgentSkill] runtime wrapper.
+     * Convert a parsed skill to an [AgentSkill] runtime wrapper.
      */
     fun toAgentSkill(definition: YamlSkillDefinition): AgentSkill {
         return object : AgentSkill {

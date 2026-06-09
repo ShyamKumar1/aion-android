@@ -156,6 +156,9 @@ class SettingsViewModel @Inject constructor(
     private suspend fun doFetchModels(provider: ProviderConfig) {
         _state.update { it.copy(isTesting = true, testResult = null) }
         try {
+            val modelUrl = provider.baseUrl.trimEnd('/') + "/" + provider.modelListPath.trimStart('/')
+            android.util.Log.d("SettingsVMDebug", "Fetching models from: $modelUrl")
+            android.util.Log.d("SettingsVMDebug", "Provider: ${provider.id}, Header: ${provider.apiKeyHeader}, Key: ${(providerRepository.activeApiKey() ?: "NULL").take(8)}...")
             val models = withContext(Dispatchers.IO) {
                 val response = httpClient.newCall(
                     Request.Builder()

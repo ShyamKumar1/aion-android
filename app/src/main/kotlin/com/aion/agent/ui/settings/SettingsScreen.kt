@@ -45,6 +45,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -387,6 +388,14 @@ private fun ApiKeyField(
     onClear: () -> Unit,
 ) {
     var showMasked by remember { mutableStateOf(true) }
+
+    // Auto-hide API key after 5 seconds when visible
+    LaunchedEffect(showMasked) {
+        if (!showMasked) {
+            kotlinx.coroutines.delay(5_000)
+            showMasked = true
+        }
+    }
 
     when {
         // When a key is ALREADY saved, show it masked (or unmasked) and read-only with Clear only

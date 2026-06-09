@@ -31,29 +31,22 @@ class BatteryMonitor @Inject constructor(
     var batteryLevel: Float = 50f
         private set
 
-    /** Whether the device is currently plugged in and charging. */
-    val isCharging: Boolean
-        get() {
-            val intent = context.registerReceiver(
-                null,
-                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-            )
-            val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-            return status == BatteryManager.BATTERY_STATUS_CHARGING ||
+    /** Whether the device was charging at last refresh. Updated by [refresh]. */
+    var isCharging: Boolean = false
+        private set
+
+    /** Refresh battery state from the system. Call this periodically. */
+    fun refresh() {
+        val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        if (intent != null) {
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+            batteryLevel = level.toFloat() / scale.toFloat() * 100f
+
+            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                 status == BatteryManager.BATTERY_STATUS_FULL
         }
-
-    /** Refresh battery level from the system. Safe to call frequently. */
-    fun refresh() {
-        val intent = context.registerReceiver(
-            null,
-            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-        )
-        batteryLevel = intent?.let {
-            val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, 0)
-            val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-            level.toFloat() / scale.toFloat() * 100f
-        } ?: 50f
     }
 
     /** Record a battery snapshot at model load time. */

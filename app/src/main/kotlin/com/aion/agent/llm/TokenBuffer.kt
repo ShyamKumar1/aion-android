@@ -17,6 +17,11 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * This composes into the existing [LlmEvent] stream — we forward [Token]
  * events through the buffer and pass through everything else.
+ *
+ * TODO: Wire this into the streaming pipeline in [LocalLlmEngine.streamReply]
+ * or [CloudLlmEngine.streamReply]. The buffer has zero callers as of Phase 1
+ * because the direct token-per-emit approach was simpler for initial debugging.
+ * Phase 2 should integrate this to reduce UI recomposition frequency.
  */
 class TokenBuffer(
     private val size: Int = 5,

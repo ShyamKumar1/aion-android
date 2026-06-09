@@ -9,7 +9,9 @@ import com.aion.agent.data.ConversationRepository
 import com.aion.agent.data.ProviderRepository
 import com.aion.agent.memory.db.ConversationEntity
 import com.aion.agent.skills.SkillResult
+import com.aion.agent.skills.builtin.ClipboardSkill
 import com.aion.agent.skills.builtin.SmsSkill
+import com.aion.agent.skills.builtin.WebSearchSkill
 import com.aion.agent.system.AgentForegroundService
 import com.aion.agent.util.AionLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +36,8 @@ class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val providerRepository: ProviderRepository,
     private val smsSkill: SmsSkill,
+    private val clipboardSkill: ClipboardSkill,
+    private val webSearchSkill: WebSearchSkill,
     private val logger: AionLogger,
 ) : ViewModel() {
 
@@ -43,6 +47,8 @@ class ChatViewModel @Inject constructor(
     private var streamingJob: Job? = null
 
     init {
+        // TODO: Move AgentForegroundService.start() to AionApplication.onCreate()
+        // Starting it here re-creates the service on every config change (screen rotation, theme change).
         AgentForegroundService.start(appContext)
         viewModelScope.launch {
             val ready = providerRepository.hasActiveProvider()
@@ -138,6 +144,11 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    /** Fill the input field with [content] so the user can modify and re-send. */
+    fun onEditMessage(content: String) {
+        _uiState.update { it.copy(inputText = content) }
+    }
+
     fun onSendClicked() {
         val state = _uiState.value
         val text = state.inputText.trim()
@@ -177,7 +188,7 @@ class ChatViewModel @Inject constructor(
     private suspend fun currentOrCreateConversation(): String {
         val existing = _uiState.value.currentConversationId
         if (existing != null) return existing
-        val convo = conversationRepository.getOrCreateConversation()
+        val convo = conversationRepository.createNewSessionConversation()
         _uiState.update { it.copy(currentConversationId = convo.id) }
         return convo.id
     }
@@ -254,6 +265,7 @@ class ChatViewModel @Inject constructor(
                             pendingConfirmation = ConfirmationRequest(
                                 skillId = event.skillId,
                                 prompt = event.prompt,
+                                params = event.params,
                             ),
                         ),
                     )
@@ -266,28 +278,26 @@ class ChatViewModel @Inject constructor(
 
     fun onConfirm(confirm: ConfirmationRequest) {
         val conversationId = _uiState.value.currentConversationId ?: return
-        if (confirm.skillId != "sms.send") {
-            _uiState.update { it.copy(errorMessage = "This action cannot be confirmed yet.") }
-            return
-        }
-        val phoneMatch = Regex("""Send SMS to (\+?\d[\d\s-]+):""").find(confirm.prompt)
-        val to = phoneMatch?.groupValues?.getOrNull(1)?.replace(Regex("""[\s-]"""), "") ?: run {
-            _uiState.update { it.copy(errorMessage = "Could not parse phone number.") }
-            return
-        }
-        val body = confirm.prompt.substringAfter("\"", "").substringBefore("\"", "")
         viewModelScope.launch(Dispatchers.IO) {
-            val result = smsSkill.sendNow(to, body)
+            val result = when (confirm.skillId) {
+                "sms.send" -> handleSmsConfirm(confirm)
+                "clipboard.manage" -> handleClipboardConfirm(confirm)
+                "web.search" -> handleWebSearchConfirm(confirm)
+                else -> {
+                    _uiState.update { it.copy(errorMessage = "Confirmation for '${confirm.skillId}' is not yet supported.") }
+                    return@launch
+                }
+            }
             val summary = when (result) {
                 is SkillResult.Success -> result.summary
-                is SkillResult.Failure -> "Send failed: ${result.reason}"
-                is SkillResult.ConfirmationRequired -> "Send cancelled"
-                is SkillResult.Timeout -> "Send timed out"
+                is SkillResult.Failure -> "Action failed: ${result.reason}"
+                is SkillResult.ConfirmationRequired -> "Action cancelled"
+                is SkillResult.Timeout -> "Action timed out"
             }
             _uiState.update { state ->
                 state.copy(
                     messages = state.messages + ChatMessage(
-                        id = "sms-result-${System.nanoTime()}",
+                        id = "action-result-${System.nanoTime()}",
                         role = ChatMessage.Role.SYSTEM,
                         content = summary,
                     ),
@@ -295,6 +305,51 @@ class ChatViewModel @Inject constructor(
             }
             conversationRepository.appendMessage(conversationId = conversationId, role = "system", content = summary)
         }
+    }
+
+    private suspend fun handleSmsConfirm(confirm: ConfirmationRequest): SkillResult {
+        // Try params first (from intent classification)
+        val paramTo = confirm.params["to"]?.trim()
+        val paramBody = confirm.params["body"]?.trim()
+        if (!paramTo.isNullOrBlank() && !paramBody.isNullOrBlank()) {
+            return smsSkill.sendNow(paramTo, paramBody)
+        }
+        // Fallback: try to parse from the prompt
+        val phoneMatch = Regex("""[\+?\d][\d\s\-\(\)\.]{6,20}[\d]""").find(confirm.prompt)
+        val to = phoneMatch?.value?.replace(Regex("""[\s\-\(\)\.]"""), "")?.trim()
+        if (to == null || to.count { it.isDigit() } < 7) {
+            return SkillResult.Failure(reason = "Could not parse phone number", summary = "Could not parse phone number.")
+        }
+        val body = confirm.prompt
+            .substringAfter("\"", "").substringBefore("\"", "")
+            .takeIf { it.isNotBlank() }
+            ?: confirm.prompt.substringAfter(":").substringAfter("\n").trim()
+        return smsSkill.sendNow(to, body)
+    }
+
+    private suspend fun handleClipboardConfirm(confirm: ConfirmationRequest): SkillResult {
+        // Try params first (from intent classification)
+        val text = confirm.params["text"]?.trim()
+            ?: confirm.params["body"]?.trim()
+        if (!text.isNullOrBlank()) return clipboardSkill.writeNow(text)
+        // Fallback: parse from prompt
+        val parsed = confirm.prompt
+            .substringAfter("\"", "").substringBefore("\"", "")
+            .takeIf { it.isNotBlank() }
+            ?: return SkillResult.Failure(reason = "No text found", summary = "Couldn't find text to copy.")
+        return clipboardSkill.writeNow(parsed)
+    }
+
+    private suspend fun handleWebSearchConfirm(confirm: ConfirmationRequest): SkillResult {
+        // Try params first
+        val query = confirm.params["query"]?.trim()
+        if (!query.isNullOrBlank()) return webSearchSkill.searchNow(query)
+        // Fallback: parse from prompt
+        val parsed = confirm.prompt
+            .substringAfter("\"", "").substringBefore("\"", "")
+            .takeIf { it.isNotBlank() }
+            ?: confirm.prompt.substringAfter("search for").substringBefore("?").trim()
+        return webSearchSkill.searchNow(parsed)
     }
 
     fun onCancel(@Suppress("UNUSED_PARAMETER") confirm: ConfirmationRequest) {

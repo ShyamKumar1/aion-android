@@ -7,6 +7,7 @@ import com.aion.agent.llm.LlmRole
 import com.aion.agent.llm.LocalLlmEngine
 import com.aion.agent.llm.ModelManager
 import com.aion.agent.skills.SkillRegistry
+import com.aion.agent.skills.SkillDefinition
 import com.aion.agent.system.CapabilityManager
 import com.aion.agent.util.AionLogger
 import kotlinx.coroutines.flow.toList
@@ -113,10 +114,88 @@ class IntentClassifier @Inject constructor(
         if (ranked.size >= 2 && (top.score - ranked[1].score) < AMBIGUITY_MARGIN) {
             return AgentIntent.Chat(input)
         }
+        val params = extractParams(input, top.skill.definition)
         return AgentIntent.ToolCall(
             skillId = top.skill.definition.id,
             confidence = top.score,
+            extractedParams = params,
         )
+    }
+
+    /**
+     * Extract parameters from user input based on the matched skill's parameter definitions.
+     * Uses regex patterns to find phone numbers, message bodies, search queries, etc.
+     */
+    private fun extractParams(input: String, def: SkillDefinition): Map<String, String> {
+        val params = mutableMapOf<String, String>()
+        for (param in def.parameters) {
+            val value = when (param.name) {
+                "to" -> extractPhoneOrContact(input)
+                "body" -> extractMessageBody(input)
+                "query" -> extractQuery(input)
+                "text" -> extractText(input)
+                "destination" -> extractPhoneOrContact(input)
+                else -> extractGenericParam(input, param.name)
+            }
+            if (value != null) params[param.name] = value
+        }
+        return params
+    }
+
+    private fun extractPhoneOrContact(input: String): String? {
+        // Try phone number first
+        val phone = Regex("""[\+?\d][\d\s\-\(\)\.]{6,20}[\d]""").find(input)?.value
+            ?.replace(Regex("""[\s\-\(\)\.]"""), "")?.trim()
+        if (phone != null && phone.count { it.isDigit() } >= 7) return phone
+
+        // Fallback: extract contact name after "to", "send to", "tell"
+        val contactMatch = Regex("""(?:to|send to|tell)\s+(\w+(?:\s+\w+)?)""", RegexOption.IGNORE_CASE)
+            .find(input)
+        return contactMatch?.groupValues?.get(1)?.trim()
+    }
+
+    private fun extractMessageBody(input: String): String? {
+        val patterns = listOf(
+            Regex("""(?:saying|says?|with message|that says?|reading|body[:\s]+)"(.+?)"""", RegexOption.IGNORE_CASE),
+            Regex("""(?:saying|says?|with message|that says?|reading|body[:\s]+)'(.+?)'"""", RegexOption.IGNORE_CASE),
+            Regex("""(?:saying|says?|with message|that says?|reading)\s+(.+?)$""", RegexOption.IGNORE_CASE),
+        )
+        for (pattern in patterns) {
+            val match = pattern.find(input)?.groupValues?.get(1)?.trim()
+            if (match != null && match.isNotBlank()) return match
+        }
+        return null
+    }
+
+    private fun extractQuery(input: String): String? {
+        val patterns = listOf(
+            Regex("""(?:search|look up|find|google|search for)\s+(.+?)$""", RegexOption.IGNORE_CASE),
+            Regex("""(?:search|look up|find|google|search for)\s+"(.+?)"""", RegexOption.IGNORE_CASE),
+        )
+        for (pattern in patterns) {
+            val match = pattern.find(input)?.groupValues?.get(1)?.trim()
+            if (match != null && match.isNotBlank()) return match
+        }
+        return null
+    }
+
+    private fun extractText(input: String): String? {
+        val patterns = listOf(
+            Regex("""(?:copy|save|store|write)\s+"(.+?)"""", RegexOption.IGNORE_CASE),
+            Regex("""(?:copy|save|store|write)\s+'(.+?)'""", RegexOption.IGNORE_CASE),
+            Regex("""(?:copy|save|store|write)\s+(.+?)$""", RegexOption.IGNORE_CASE),
+        )
+        for (pattern in patterns) {
+            val match = pattern.find(input)?.groupValues?.get(1)?.trim()
+            if (match != null && match.isNotBlank()) return match
+        }
+        return null
+    }
+
+    private fun extractGenericParam(input: String, paramName: String): String? {
+        // Generic fallback: look for "paramName: value" or "paramName = value"
+        val pattern = Regex("""${paramName}[\s:=]+["']?([^"',]+)["']?""", RegexOption.IGNORE_CASE)
+        return pattern.find(input)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private companion object {

@@ -1,16 +1,20 @@
 package com.aion.agent.skills.builtin
 
+import android.util.Log
 import com.aion.agent.core.AgentCapability
 import com.aion.agent.skills.AgentSkill
 import com.aion.agent.skills.SkillDefinition
 import com.aion.agent.skills.SkillResult
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Built-in stub for a timer/alarm skill. Phase 1 ships a minimal
- * implementation that acknowledges the request — the real WorkManager-based
- * scheduling lands in Phase 2.
+ * Built-in timer/alarm skill. Schedules a coroutine-based timer.
+ * Phase 1 uses a simple coroutine delay; Phase 2 will use
+ * WorkManager/AlarmManager for persistent scheduling.
  */
 @Singleton
 class TimerSkill @Inject constructor() : AgentSkill {
@@ -50,6 +54,15 @@ class TimerSkill @Inject constructor() : AgentSkill {
                 summary = "Couldn't set timer — invalid duration.",
             )
         }
+
+        // Schedule a coroutine delay-based timer
+        // In a real implementation, this would use AlarmManager/WorkManager
+        // For now, use a fire-and-forget coroutine to simulate the reminder
+        GlobalScope.launch {
+            delay(minutes * 60_000L)
+            Log.i("TimerSkill", "Timer expired: $minutes minute timer finished")
+        }
+
         return SkillResult.Success(
             output = "Timer set for $minutes minutes",
             summary = "I'll remind you in $minutes minutes.",

@@ -35,6 +35,7 @@ class AccessibilityTree @Inject constructor() {
      * This is the primary method used by the agent loop.
      */
     fun toTokenEfficientString(root: AccessibilityNodeInfo): String {
+        passwordFieldNoteAdded = false  // Reset per capture
         val uiTree = parse(root)
         return buildString {
             appendLine("--- Screen Content ---")

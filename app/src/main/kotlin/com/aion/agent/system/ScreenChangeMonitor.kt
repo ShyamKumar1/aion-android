@@ -17,6 +17,12 @@ import kotlinx.coroutines.launch
  *
  * This prevents the agent loop from being overwhelmed during high-frequency
  * events like typing or scrolling.
+ *
+ * TODO: Wire this into [AgentLoop] or [TriggerEngine]. Currently,
+ * [AgentAccessibilityService.onAccessibilityEvent] directly captures
+ * screen content via [AccessibilityTree] without debouncing. This monitor
+ * should be integrated in Phase 3 when high-frequency screen events
+ * (scrolling, typing) need debouncing before reaching the LLM context.
  */
 @Singleton
 class ScreenChangeMonitor @Inject constructor(

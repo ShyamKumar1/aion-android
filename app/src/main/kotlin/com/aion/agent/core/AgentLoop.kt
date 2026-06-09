@@ -114,7 +114,7 @@ class AgentLoop @Inject constructor(
         )
 
         val request = LlmRequest(
-            systemPrompt = SYSTEM_PROMPT,
+            systemPrompt = contextManager.getSystemPrompt(),
             messages = messages,
             tools = skillRegistry.definitions(),
             maxTokens = 1024,
@@ -182,7 +182,7 @@ class AgentLoop @Inject constructor(
                 )
             }
             is SkillResult.ConfirmationRequired -> {
-                emit(AgentEvent.ConfirmationRequest(skill.definition.id, result.prompt))
+                emit(AgentEvent.ConfirmationRequest(skill.definition.id, result.prompt, intent.extractedParams))
             }
             is SkillResult.Failure -> {
                 emit(AgentEvent.Error(result.reason))
@@ -195,14 +195,6 @@ class AgentLoop @Inject constructor(
 
     private companion object {
         const val TAG = "AgentLoop"
-        // Not a const because trimIndent() is a runtime function. The JVM
-        // bytecode will still inline this as a private static field.
-        val SYSTEM_PROMPT = """
-            You are AION, a private on-device AI agent. Be concise, helpful, and
-            never claim to perform actions you cannot actually perform. If asked
-            to do something that requires a tool, use the tool. Otherwise, just
-            respond.
-        """.trimIndent()
     }
 }
 
@@ -215,7 +207,11 @@ sealed class AgentEvent {
     data class ToolCall(val toolName: String, val argumentsJson: String) : AgentEvent()
     data class SkillInvoked(val skillId: String, val skillName: String) : AgentEvent()
     data class SkillResult(val summary: String) : AgentEvent()
-    data class ConfirmationRequest(val skillId: String, val prompt: String) : AgentEvent()
+    data class ConfirmationRequest(
+        val skillId: String,
+        val prompt: String,
+        val params: Map<String, String> = emptyMap(),
+    ) : AgentEvent()
     data object Finished : AgentEvent()
     data class Error(val message: String) : AgentEvent()
     data class Done(val reason: DoneReason) : AgentEvent()

@@ -57,7 +57,9 @@ class SkillPackager @Inject constructor(
         appendLine("name: ${d.name}")
         appendLine("version: ${d.version}")
         appendLine("description: |")
-        appendLine("  ${d.description}")
+        d.description.lines().forEach { line ->
+            appendLine("  $line")
+        }
         appendLine("keywords: [${d.keywords.joinToString(", ")}]")
         appendLine("required_permissions: [${d.requiredPermissions.joinToString(", ")}]")
         appendLine("required_capability: ${d.requiredCapability.name}")

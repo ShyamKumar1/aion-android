@@ -3,11 +3,13 @@ package com.aion.agent.di
 import android.content.Context
 import androidx.room.Room
 import com.aion.agent.memory.db.AionDatabase
+import com.aion.agent.memory.db.LogDao
 import com.aion.agent.memory.db.ContextSummaryDao
 import com.aion.agent.memory.db.ConversationDao
 import com.aion.agent.memory.db.MemoryDao
 import com.aion.agent.memory.db.MessageDao
 import com.aion.agent.memory.db.NotificationDao
+import com.aion.agent.util.LogRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -55,7 +57,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AionDatabase =
         Room.databaseBuilder(context, AionDatabase::class.java, AionDatabase.NAME)
-            .fallbackToDestructiveMigration() // Phase 1 — replace with real migrations in Phase 2
+            .fallbackToDestructiveMigration() // TODO: Replace with proper Migration objects before production release
             .build()
 
     @Provides
@@ -72,4 +74,7 @@ object AppModule {
 
     @Provides
     fun provideContextSummaryDao(db: AionDatabase): ContextSummaryDao = db.contextSummaryDao()
+
+    @Provides
+    fun provideLogDao(db: AionDatabase): LogDao = db.logDao()
 }

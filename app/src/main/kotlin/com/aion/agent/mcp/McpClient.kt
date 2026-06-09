@@ -34,19 +34,37 @@ class McpClient @Inject constructor(
 
     /**
      * Connect to an external MCP server.
-     * Sends initialize handshake on connect.
+     * Sends initialize handshake on connect and keeps the session alive
+     * by consuming incoming frames in the WebSocket lambda.
      */
     suspend fun connect(server: ExternalServer): Boolean {
         return try {
             client.webSocket(server.url) {
-                val initMsg = """{"jsonrpc":"2.0","id":"1","method":"initialize","params":{}}"""
+                val initMsg =
+                    """{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{}}}"""
                 send(Frame.Text(initMsg))
+
+                // Wait for initialize response
+                val response = incoming.receive()
+                if (response is Frame.Text) {
+                    val responseText = response.readText()
+                    logger.i(TAG) { "MCP initialize response received: ${responseText.take(100)}" }
+                }
+
                 connections[server.id] = this
                 logger.i(TAG) { "Connected to external MCP: ${server.id}" }
+
+                // Keep connection alive by consuming incoming frames.
+                // This prevents the webSocket block from exiting and closing the session.
+                for (frame in incoming) {
+                    if (frame is Frame.Close) break
+                }
             }
             true
         } catch (t: Throwable) {
             logger.e(TAG, t) { "Failed to connect to ${server.id}" }
+            // Clean up if we added the connection before the failure
+            connections.remove(server.id)
             false
         }
     }

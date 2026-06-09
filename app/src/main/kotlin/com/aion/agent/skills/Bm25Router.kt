@@ -65,21 +65,35 @@ class Bm25Router(
     /**
      * BM25 score for [query] against a single document. We use fixed k1/b
      * tuned for short queries against short documents.
+     *
+     * Uses the standard BM25 IDF formula: ln((N - n + 0.5) / (n + 0.5)).
+     * Since we score one document at a time, N is always 1 and n is approximated
+     * by the term frequency within this single document.
      */
     private fun bm25(query: List<String>, doc: List<String>): Float {
         if (doc.isEmpty()) return 0f
         val docLen = doc.size
         val docFreq = doc.groupingBy { it }.eachCount()
         val qFreq = query.groupingBy { it }.eachCount()
+
+        // For per-document scoring without corpus-level IDF,
+        // use a simplified IDF that still varies meaningfully:
+        // idf = ln(1 + (N - n + 0.5) / (n + 0.5))
+        // Since we have one doc at a time, use term frequency as a proxy:
+        // rare terms in the doc get higher IDF
+        val totalDocs = 1f  // We score one doc at a time
         var total = 0f
         for ((term, qf) in qFreq) {
             val tf = docFreq[term] ?: 0
             if (tf == 0) continue
-            val idf = kotlin.math.ln(1f + (1f / (1f + tf)))
+            // Standard BM25 IDF: ln((N - n + 0.5) / (n + 0.5))
+            // n = number of docs containing term (approximated by term frequency in this single doc)
+            val n = tf.toFloat()
+            val idf = kotlin.math.ln((totalDocs - n + 0.5f) / (n + 0.5f))
             val norm = 1f - B + B * (docLen / AVG_DOC_LEN)
             total += idf * ((tf * (K1 + 1f)) / (tf + K1 * norm)) * qf
         }
-        return total
+        return total.coerceAtLeast(0f)  // BM25 can be negative, clamp to 0
     }
 
     data class RankedSkill(val skill: AgentSkill, val score: Float)

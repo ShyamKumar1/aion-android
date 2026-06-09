@@ -1,5 +1,6 @@
 package com.aion.agent.llm
 
+import android.app.ActivityManager
 import android.content.Context
 import com.aion.agent.core.AionException
 import com.aion.agent.util.AionLogger
@@ -86,5 +87,27 @@ class ModelManagerTest {
     fun `loadedModelName returns null when idle`() = runTest {
         val mgr = ModelManager(engine, context, logger)
         assert(mgr.loadedModelName == null)
+    }
+
+    @Test
+    fun `loadClassifier insufficient RAM returns InsufficientRamException`() = runTest {
+        val am = mockk<ActivityManager>(relaxed = true)
+        // Mock getSystemService to return our mock ActivityManager
+        every { context.getSystemService(Context.ACTIVITY_SERVICE) } returns am
+        // Mock getMemoryInfo to set low available memory on the passed MemoryInfo object
+        every { am.getMemoryInfo(any()) } answers {
+            val info = firstArg<ActivityManager.MemoryInfo>()
+            info.availMem = 100_000_000L // 100 MB — well below 1.8GB * 1.2 = 2.16GB required
+        }
+
+        coEvery { engine.isReady() } returns false
+
+        val mgr = ModelManager(engine, context, logger)
+        val result = mgr.loadClassifier("/models/qwen.gguf")
+
+        assert(result.isFailure)
+        val exception = result.exceptionOrNull()
+        assert(exception is AionException.InsufficientRamException)
+        assert(mgr.state.value is ModelState.Error)
     }
 }

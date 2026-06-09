@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.aion.agent.system.NotificationChannels
+import com.aion.agent.util.LogRepository
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -24,9 +25,31 @@ class AionApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var logRepo: LogRepository
+
     override fun onCreate() {
         super.onCreate()
         registerNotificationChannels()
+        setupCrashHandler()
+    }
+
+    /**
+     * Captures otherwise-uncaught exceptions so they appear in the Event Log
+     * instead of being silently lost. The system will still crash afterwards.
+     */
+    private fun setupCrashHandler() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            logRepo.fatal(
+                tag = "AION",
+                t = throwable,
+                message = "Uncaught exception on thread ${thread.name}",
+                category = com.aion.agent.util.LogCategory.SYSTEM,
+            )
+            // Chain to the previous handler so Android still shows the crash dialog
+            previous?.uncaughtException(thread, throwable)
+        }
     }
 
     override val workManagerConfiguration: Configuration

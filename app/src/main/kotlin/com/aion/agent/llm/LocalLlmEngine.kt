@@ -132,7 +132,12 @@ class LocalLlmEngine @Inject constructor(
 
     companion object {
         private const val TAG = "LocalLlm"
-        /** Default GPU layers for Qwen2.5 3B on Adreno 7xx. 0 = CPU-only. */
-        const val DEFAULT_GPU_LAYERS = 0
+        /**
+         * Default number of GPU layers for local inference.
+         * 0 = CPU only (slow but compatible).
+         * 20 = ~80% offload for Qwen2.5-3B on Adreno 7xx (recommended starting point).
+         * Users can override in Settings when local LLM tuning is added.
+         */
+        const val DEFAULT_GPU_LAYERS = 20
     }
 }

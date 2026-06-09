@@ -36,7 +36,9 @@ sealed class ModelState {
  * Per AION_GUIDELINES §10:
  *  - CLASSIFIER slot: loaded on first user interaction after app start,
  *    stays resident unless sleep mode activates.
- *  - PLANNER slot (Phase 3+): loaded on demand for complex tasks.
+ *  - PLANNER slot: constants are defined (PLANNER_ESTIMATED_BYTES) but not
+ *    yet implemented. Planned for Phase 3 when multi-model pipelines are needed.
+ *    See AION_PLAN for details on the classifier → planner routing architecture.
  *
  * RAM check (N6): before loading any model, queries [ActivityManager.MemoryInfo].
  * If [availMem] < [requiredBytes] * 1.2, refuses to load.
@@ -155,7 +157,7 @@ class ModelManager @Inject constructor(
         private const val TAG = "ModelManager"
         /** Estimated RAM for Qwen2.5-3B-Q4_K_M (~1.8GB). */
         const val CLASSIFIER_ESTIMATED_BYTES: Long = 1_800_000_000L
-        /** Estimated RAM for 7B model (~3.5GB). */
+        /** Estimated RAM for 7B model (~3.5GB). Not yet implemented — reserved for Phase 3. */
         const val PLANNER_ESTIMATED_BYTES: Long = 3_500_000_000L
         /** Estimated RAM for embedding model (~200MB). */
         const val EMBEDDING_ESTIMATED_BYTES: Long = 200_000_000L

@@ -10,36 +10,51 @@ import javax.inject.Singleton
  *  - Never log raw user content (messages, contact names, notification text)
  *  - Strip API key patterns: `sk-...`, `AIza...`, any user-registered prefix
  *  - In release builds, only WARN/ERROR are emitted
+ *
+ * Every call also delegates to [LogRepository] so logs are persisted in the
+ * in-app database and viewable from the Log Viewer screen.
  */
 @Singleton
-class AionLogger @Inject constructor() {
+class AionLogger @Inject constructor(
+    private val logRepo: LogRepository,
+) {
 
     fun d(tag: String, message: () -> String) {
         if (!BuildConfig.DEBUG) return
-        Log.d(tag, redact(message()))
+        val msg = redact(message())
+        Log.d(tag, msg)
+        logRepo.d(tag, msg)
     }
 
     fun i(tag: String, message: () -> String) {
         if (!BuildConfig.DEBUG) return
-        Log.i(tag, redact(message()))
+        val msg = redact(message())
+        Log.i(tag, msg)
+        logRepo.i(tag, msg)
     }
 
     fun w(tag: String, message: () -> String) {
-        if (!BuildConfig.DEBUG) return
-        Log.w(tag, redact(message()))
+        val msg = redact(message())
+        Log.w(tag, msg)
+        logRepo.w(tag, msg)
     }
 
     fun w(tag: String, t: Throwable, message: () -> String) {
-        if (!BuildConfig.DEBUG) return
-        Log.w(tag, redact(message()), t)
+        val msg = redact(message())
+        Log.w(tag, msg, t)
+        logRepo.w(tag, t, msg)
     }
 
     fun e(tag: String, message: () -> String) {
-        Log.e(tag, redact(message()))
+        val msg = redact(message())
+        Log.e(tag, msg)
+        logRepo.e(tag, msg)
     }
 
     fun e(tag: String, t: Throwable, message: () -> String) {
-        Log.e(tag, redact(message()), t)
+        val msg = redact(message())
+        Log.e(tag, msg, t)
+        logRepo.e(tag, t, msg)
     }
 
     private fun redact(input: String): String {
@@ -57,6 +72,9 @@ class AionLogger @Inject constructor() {
             Regex("""AIza[A-Za-z0-9_-]{16,}"""),
             Regex("""nvapi-[A-Za-z0-9_-]{16,}"""),
             Regex("""(?i)bearer\s+[A-Za-z0-9._~+/-]{16,}"""),
+            Regex("""sk-ant-[A-Za-z0-9_-]{16,}"""),
+            Regex("""sk-proj-[A-Za-z0-9_-]{16,}"""),
+            Regex("""t1v[A-Za-z0-9_-]{16,}"""),
         )
     }
 }

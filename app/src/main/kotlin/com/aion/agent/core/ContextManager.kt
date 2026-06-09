@@ -139,6 +139,13 @@ class ContextManager @Inject constructor(
         return out
     }
 
+    /**
+     * Returns the system prompt shared across the agent.
+     * Single source of truth — other components should call this
+     * instead of defining their own SYSTEM_PROMPT.
+     */
+    fun getSystemPrompt(): String = SYSTEM_PROMPT
+
     /** Rough token estimation: 4 characters ≈ 1 token. */
     private fun estimateTokens(text: String): Int =
         (text.length / 4) + 1

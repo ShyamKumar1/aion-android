@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -142,6 +143,7 @@ fun ChatScreen(
                             message = msg,
                             onConfirm = { m -> m.pendingConfirmation?.let(viewModel::onConfirm) },
                             onCancel = { m -> m.pendingConfirmation?.let(viewModel::onCancel) },
+                            onEdit = { content -> viewModel.onEditMessage(content) },
                         )
                     }
                     if (state.isResponding) {
@@ -319,7 +321,7 @@ private fun ConversationListPanel(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                LazyColumn(modifier = Modifier.height(300.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.4f)) {
                     items(items = conversations, key = { it.id }) { convo ->
                         val isActive = convo.id == activeId
                         ConversationListItem(

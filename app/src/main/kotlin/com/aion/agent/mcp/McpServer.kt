@@ -58,7 +58,7 @@ class McpServer @Inject constructor(
     fun start(port: Int = 8765, bindAddress: String = "127.0.0.1"): Boolean {
         if (server != null) return true
 
-        val portsToTry = (listOf(port) + listOf(8765, 8766, 8767, 8768)).distinct()
+        val portsToTry = listOf(port) + (listOf(8765, 8766, 8767, 8768) - port)
 
         for (tryPort in portsToTry) {
             try {

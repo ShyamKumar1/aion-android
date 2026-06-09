@@ -101,7 +101,12 @@ class TriggerEngine @Inject constructor(
         return (System.currentTimeMillis() - last) > debounceMs
     }
 
-    /** Register common phrase-based triggers from user input patterns. */
+    /**
+     * Register common phrase-based triggers from user input patterns.
+     * TODO: Phase 4 — this should prompt the user to create a trigger rule
+     * and register it via [register]. Currently detects phrases but doesn't
+     * offer any UI for trigger creation.
+     */
     fun suggestFromChat(input: String) {
         if (input.contains("every morning", ignoreCase = true) ||
             input.contains("each morning", ignoreCase = true)) {

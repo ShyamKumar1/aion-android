@@ -59,6 +59,10 @@ class CloudLlmEngine @Inject constructor(
         val model = providerRepository.activeModelId()
             ?: throw AionException.InvalidConfigurationException("No model selected")
 
+        android.util.Log.d("CloudLlmDebug", "URL=${provider.baseUrl.trimEnd('/') + "/chat/completions"}")
+        android.util.Log.d("CloudLlmDebug", "Provider=${provider.id}, Key=${apiKey.take(8)}..., Model=$model")
+        android.util.Log.d("CloudLlmDebug", "Headers: Auth=${provider.apiKeyHeader}, UA=${provider.defaultHeaders["User-Agent"]}")
+
         val requestBody = json.encodeToString(
             OpenAiChatRequest.serializer(),
             buildChatRequest(model, request, provider, request.tools),

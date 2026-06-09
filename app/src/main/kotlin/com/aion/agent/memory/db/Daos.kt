@@ -75,6 +75,9 @@ interface NotificationDao {
     @Query("SELECT package_name FROM notifications GROUP BY package_name ORDER BY MAX(posted_at) DESC")
     suspend fun distinctPackages(): List<String>
 
+    @Query("SELECT * FROM notifications ORDER BY posted_at DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int): List<NotificationEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(notification: NotificationEntity)
 

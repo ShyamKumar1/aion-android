@@ -93,7 +93,15 @@ class LlamaBridge @Inject constructor(
         nativeGenerate(prompt, maxTokens, temperature) { tokenText ->
             trySend(tokenText)
         }
-        awaitClose { /* generation completed or cancelled */ }
+        awaitClose {
+            // If the flow is cancelled mid-generation, we should ideally abort
+            // native generation. The current JNI interface doesn't support
+            // cancellation, so we log a warning. Phase 2 will add a native
+            // abort function.
+            if (isLoaded) {
+                logger.d(TAG) { "Generation flow cancelled — native generation may continue briefly" }
+            }
+        }
     }.flowOn(Dispatchers.Default)
 
     /**

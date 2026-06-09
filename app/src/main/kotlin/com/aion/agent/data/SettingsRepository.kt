@@ -103,7 +103,11 @@ class SettingsRepository @Inject constructor(
     suspend fun getCpuTimeMs(): Long = ds.data.first()[KEY_CPU_TIME_MS] ?: 0L
 
     suspend fun resetBatteryStats() {
-        ds.edit { it.clear() }
+        ds.edit { prefs ->
+            prefs.remove(KEY_MODEL_LOAD_BATTERY)
+            prefs.remove(KEY_CPU_TIME_MS)
+            prefs.remove(KEY_MODEL_LOADED_TIME_MS)
+        }
     }
 
     suspend fun setSleepTimeoutMinutes(minutes: Int) {

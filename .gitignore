@@ -37,3 +37,10 @@ Thumbs.db
 # Local config with secrets
 secrets.properties
 .aion-env.sh
+
+# Hermes workspace files
+.hermes/
+.understand-anything/
+
+# Development artifacts
+docs/superpowers/

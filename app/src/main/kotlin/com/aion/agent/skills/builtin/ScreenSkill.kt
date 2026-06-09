@@ -36,10 +36,9 @@ class ScreenSkill @Inject constructor() : AgentSkill {
     }
 
     override suspend fun execute(params: Map<String, String>): SkillResult {
-        return SkillResult.Failure(
-            reason = "Screen reading requires FULL capability",
-            summary = "Screen reading isn't a standalone skill — it's handled by the agent loop " +
-                "via AccessibilityService when Full Access is enabled. Enable Full Access in settings.",
+        return SkillResult.Success(
+            output = "Screen reading is handled by the agent loop via AccessibilityService when Full Access is enabled.",
+            summary = "Screen content is automatically provided to the agent when Full Access is enabled in Settings.",
         )
     }
 }

@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -32,7 +33,7 @@ android {
         applicationId = "com.aion.agent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 100
+        versionCode = getVersionCode()
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -56,7 +57,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             // Signing will be configured when release is needed; for now unsigned for CI
         }
@@ -83,7 +84,7 @@ android {
 
     packaging {
         resources {
-            excludes += setOf(
+            val excluded = setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
                 "/META-INF/DEPENDENCIES",
                 "/META-INF/LICENSE",
@@ -93,6 +94,7 @@ android {
                 "/META-INF/INDEX.LIST",
                 "/META-INF/io.netty.versions.properties",
             )
+            excludes += excluded
         }
     }
 
@@ -123,6 +125,20 @@ android {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
         }
+    }
+}
+
+/**
+ * Computes a monotonically increasing versionCode from git history.
+ * Base versionCode of 100 + git commit count. Falls back to 100 if git is unavailable.
+ */
+fun getVersionCode(): Int {
+    return try {
+        val process = Runtime.getRuntime().exec("git rev-list --count HEAD")
+        val count = process.inputStream.bufferedReader().readText().trim().toInt()
+        100 + count
+    } catch (e: Exception) {
+        100
     }
 }
 

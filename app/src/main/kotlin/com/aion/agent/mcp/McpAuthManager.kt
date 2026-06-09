@@ -2,6 +2,8 @@ package com.aion.agent.mcp
 
 import android.content.Context
 import android.util.Base64
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.aion.agent.util.AionLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.SecureRandom
@@ -23,24 +25,35 @@ class McpAuthManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val logger: AionLogger,
 ) {
-    private val prefs = context.getSharedPreferences("mcp_auth", Context.MODE_PRIVATE)
+    private val securePrefs by lazy {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            SECURE_PREFS_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
     private val rateLimitCounts = ConcurrentHashMap<String, RateLimitEntry>()
     private val random = SecureRandom()
 
     /** Get the current token, generating one if it doesn't exist. */
     fun getToken(): String {
-        val existing = prefs.getString(KEY_TOKEN, null)
+        val existing = securePrefs.getString(KEY_TOKEN, null)
         if (existing != null) return existing
         val bytes = ByteArray(32)
         random.nextBytes(bytes)
         val token = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-        prefs.edit().putString(KEY_TOKEN, token).apply()
+        securePrefs.edit().putString(KEY_TOKEN, token).apply()
         return token
     }
 
     /** Rotate the token (invalidating the old one). */
     fun rotateToken(): String {
-        prefs.edit().remove(KEY_TOKEN).apply()
+        securePrefs.edit().remove(KEY_TOKEN).apply()
         return getToken()
     }
 
@@ -62,7 +75,7 @@ class McpAuthManager @Inject constructor(
                 return false
             }
         }
-        val validToken = prefs.getString(KEY_TOKEN, null) ?: return false
+        val validToken = securePrefs.getString(KEY_TOKEN, null) ?: return false
         return constantTimeEquals(token, validToken)
     }
 
@@ -74,9 +87,9 @@ class McpAuthManager @Inject constructor(
     }
 
     private fun constantTimeEquals(a: String, b: String): Boolean {
-        if (a.length != b.length) return false
-        var result = 0
-        for (i in a.indices) result = result or (a[i].code xor b[i].code)
+        var result = a.length xor b.length
+        val minLen = minOf(a.length, b.length)
+        for (i in 0 until minLen) result = result or (a[i].code xor b[i].code)
         return result == 0
     }
 
@@ -85,6 +98,7 @@ class McpAuthManager @Inject constructor(
     companion object {
         private const val TAG = "McpAuth"
         private const val KEY_TOKEN = "mcp_auth_token"
+        private const val SECURE_PREFS_NAME = "mcp_auth_secure"
         private const val MAX_ATTEMPTS_PER_MINUTE = 5
     }
 }

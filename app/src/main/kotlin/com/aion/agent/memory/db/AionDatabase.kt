@@ -22,8 +22,9 @@ import androidx.room.RoomDatabase
         NotificationEntity::class,
         MemoryEntity::class,
         ContextSummaryEntity::class,
+        LogEntry::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AionDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class AionDatabase : RoomDatabase() {
     abstract fun notificationDao(): NotificationDao
     abstract fun memoryDao(): MemoryDao
     abstract fun contextSummaryDao(): ContextSummaryDao
+    abstract fun logDao(): LogDao
 
     companion object {
         const val NAME = "aion.db"

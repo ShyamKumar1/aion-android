@@ -8,7 +8,6 @@ import com.aion.agent.skills.SkillDefinition
 import com.aion.agent.skills.SkillParameter
 import com.aion.agent.skills.SkillResult
 import com.aion.agent.util.AionLogger
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,7 +54,7 @@ class NotificationSkill @Inject constructor(
         val limit = (params["limit"]?.toIntOrNull() ?: 5).coerceIn(1, 50)
 
         val notifications: List<NotificationEntity> = try {
-            notificationDao.observeAll().first().take(limit)
+            notificationDao.getRecent(limit)
         } catch (t: Throwable) {
             logger.e("NotificationSkill", t) { "Failed to query notifications" }
             return SkillResult.Failure(

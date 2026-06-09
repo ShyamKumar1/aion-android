@@ -112,7 +112,12 @@ class AgentNotificationListener : NotificationListenerService() {
         }
     }
 
-    /** Snooze a notification by its key (re-posts after [millis]). */
+    /**
+     * Snooze a notification by its key (re-posts after [millis]).
+     * TODO: Wire this into the agent loop when notification-based triggers
+     * are implemented (Phase 4). Currently the agent reads notifications
+     * via [NotificationSkill] but doesn't snooze them.
+     */
     fun snooze(key: String, millis: Long = 300_000) {
         cancelNotification(key)
         scope.launch {
